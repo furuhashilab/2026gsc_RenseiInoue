@@ -13,7 +13,38 @@
 
 | 名称 | 内容 | リンク |
 |---|---|---|
-| 新宿駅 立体アクセシビリティ表示案（3D＋2D） | OSMの実データで新宿駅周辺を3D表示し、地物を選ぶと2Dの階平面図で階内の位置を確定する表示案モックアップ（パソコン向け） | [公開ページ](https://furuhashilab.github.io/2026gsc_RenseiInoue/mockup/shinjuku/) ・ [説明（#3）](https://github.com/furuhashilab/2026gsc_RenseiInoue/issues/3) |
+| 新宿駅 立体アクセシビリティ表示案（3D＋2D） | OSMの実データで新宿駅周辺を3D表示し、地物を選ぶと2Dの階平面図で階内の位置を確定する表示案モックアップ（パソコン向け） | [公開ページ](https://furuhashilab.github.io/2026gsc_RenseiInoue/mockup/shinjuku/) ・ [説明（#3）](https://github.com/furuhashilab/2026gsc_RenseiInoue/issues/3) ・ [ソース](mockup/shinjuku/) |
+
+### 新宿駅 表示案の主な機能
+
+- **3D全体表示**：建物と、車椅子対応状況のピン（全面・一部・非対応・不明）を立体で表示する。
+  - 各ピンから床まで縦線を引き、その地物が**どの階にあるか**を指し示す。
+  - 階の違いが分かるよう、高さ（建物・階の間隔）を実際の**2.5倍に強調**している。
+- **地面の境界線**：地面（GL）を茶色の線で示し、その下に地下の断面を表示する。地下の地物は地面まで線を伸ばし、地上の地物と区別できるようにしている。
+- **3D＋2Dの分割表示**：ピンを選ぶと画面が左右に分かれる。
+  - 左の3D：選んだ地点の周りをゆっくり回転しながら、建物と階の高さ（Z）を示す。回転は一時停止できる。
+  - 右の2D：その階の屋内平面図で、階内の位置（X・Y）を示す。階ボタンでは、1FとB1Fの間に「地面」の区切りを入れている。
+- **データの現状**：
+  - 階情報（`level`）のある地物は1,109件中637件（57%）。
+  - 階情報がない地物には警告を出し、OSMの編集ページへのリンクを表示する。
+
+### ファイル構成と作り直し方
+
+| パス | 内容 |
+|---|---|
+| `mockup/shinjuku/index.html` | 公開ページ本体。データを埋め込んだ1つのHTMLで、`gh-pages` ブランチと同じ内容 |
+| `mockup/shinjuku/src/shinjuku-template.html` | 画面のテンプレート（HTML・CSS・JavaScript） |
+| `mockup/shinjuku/src/data/` | OSMから変換した軽量データ（2026-11-04取得） |
+| `mockup/shinjuku/src/tools/` | OverpassのJSONを軽量データに変換するスクリプト（PowerShell） |
+| `mockup/shinjuku/src/build.ps1` | テンプレートとデータを組み合わせて `index.html` を作るスクリプト |
+
+テンプレートを編集したら、次のコマンドで作り直す。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File mockup/shinjuku/src/build.ps1 -DataDir mockup/shinjuku/src/data -PagesOut mockup/shinjuku/index.html
+```
+
+公開は `gh-pages` ブランチの `mockup/shinjuku/index.html` から行っている（GitHub Pages）。
 
 地図データ：© OpenStreetMap contributors（[ODbL](https://www.openstreetmap.org/copyright)）
 

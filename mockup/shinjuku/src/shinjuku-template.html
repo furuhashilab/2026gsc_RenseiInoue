@@ -1,0 +1,742 @@
+<title>新宿駅 立体アクセシビリティ表示案</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: Wheelmap-like shell (header pill, search card, category chips, map controls). 3D map is the base view; selecting a place splits into 3D (Z) | 2D floor plan (X/Y). */
+:root{
+  --bg:#ffffff;--surface:#ffffff;--surface-2:#f2f3f7;--ink:#21201c;--ink-2:#63635e;--line:#e2e3e8;--line-strong:#b8bcc6;
+  --primary:#1f2d5c;--primary-ink:#ffffff;--primary-soft:#e9edfb;--floor-hl:#3e63dd;
+  --s-yes:#46a758;--s-limited:#ffba18;--s-no:#ce2c31;--s-unknown:#7a7a7a;
+  --map-ground:#efede8;--map-road:#ffffff;--map-road-edge:#dcd8d0;--map-rail:#b9b4ab;--map-bldg:#e3ded6;--map-edge:#c9c2b6;
+  --in-room:#f7f4ee;--in-corr:#e8eefc;--in-wall:#5d5a52;--in-col:#9c978d;
+  --gl:#8a5a2b;--earth:#b98a5a;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 14px rgba(16,24,40,.10);
+  --font-ui:"Inter","Noto Sans JP",-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111215;--surface:#1a1b20;--surface-2:#24262c;--ink:#eeeef0;--ink-2:#a5a7ae;--line:#2d2f36;--line-strong:#4b4e57;
+  --primary:#3e63dd;--primary-ink:#fff;--primary-soft:#1e2541;--floor-hl:#6e8bff;
+  --map-ground:#1b1d22;--map-road:#2b2e35;--map-road-edge:#24262c;--map-rail:#4a4d55;--map-bldg:#2e3138;--map-edge:#454953;
+  --in-room:#262931;--in-corr:#1f2a4a;--in-wall:#b9bbc2;--in-col:#5e616a;--gl:#d9a46c;--earth:#7a5636;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.4);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111215;--surface:#1a1b20;--surface-2:#24262c;--ink:#eeeef0;--ink-2:#a5a7ae;--line:#2d2f36;--line-strong:#4b4e57;
+  --primary:#3e63dd;--primary-ink:#fff;--primary-soft:#1e2541;--floor-hl:#6e8bff;
+  --map-ground:#1b1d22;--map-road:#2b2e35;--map-road-edge:#24262c;--map-rail:#4a4d55;--map-bldg:#2e3138;--map-edge:#454953;
+  --in-room:#262931;--in-corr:#1f2a4a;--in-wall:#b9bbc2;--in-col:#5e616a;--gl:#d9a46c;--earth:#7a5636;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.4);color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:14px;overflow:hidden}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--floor-hl);outline-offset:2px}
+a{color:var(--floor-hl)}
+.app{height:100%;display:grid;grid-template-rows:auto 1fr}
+
+/* header — same rhythm as the Wheelmap beta header */
+.top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;height:48px;padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px));background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:8px;min-width:0}
+.mark{width:26px;height:26px;border-radius:6px;background:var(--primary);display:grid;place-items:center;flex:none}
+.brand b{font-size:15px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{font-size:10.5px;font-weight:700;color:#fff;background:var(--floor-hl);padding:1px 6px;border-radius:4px;white-space:nowrap}
+.pill{display:flex;align-items:center;gap:10px;height:34px;padding:0 4px 0 16px;border-radius:999px;background:var(--primary-soft);color:var(--primary);font-weight:500;white-space:nowrap;border:0;cursor:pointer}
+:root[data-theme="dark"] .pill{color:#c8d2ff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .pill{color:#c8d2ff}}
+.pill i{width:26px;height:26px;border-radius:50%;background:var(--primary);display:grid;place-items:center}
+.tools{display:flex;gap:6px;justify-content:flex-end}
+.ibtn{width:34px;height:34px;border-radius:6px;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--ink)}
+.ibtn:hover{background:var(--surface-2)}
+.ibtn.on{background:var(--primary-soft);color:var(--primary)}
+
+.stage{position:relative;min-height:0;display:grid;grid-template-columns:1fr 0fr;transition:grid-template-columns .45s ease}
+.app.split .stage{grid-template-columns:1fr minmax(360px,1fr)}
+.view3d{position:relative;min-width:0;min-height:0;background:var(--map-ground);overflow:hidden}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.blabel{position:absolute;transform:translate(-50%,-50%);font-size:11.5px;font-weight:600;color:var(--ink-2);white-space:nowrap;text-shadow:0 0 3px var(--map-ground),0 0 3px var(--map-ground),0 0 2px var(--map-ground)}
+.flabel{position:absolute;transform:translate(10px,-50%);font:500 11px/1 var(--font-mono);color:var(--ink-2);white-space:nowrap;text-shadow:0 0 3px var(--map-ground)}
+.flabel.on{color:#fff;background:var(--floor-hl);padding:3px 5px;border-radius:3px;text-shadow:none}
+.gllabel{position:absolute;transform:translate(calc(-100% - 8px),-50%);font:600 11px/1 var(--font-mono);color:var(--gl);white-space:nowrap;text-shadow:0 0 3px var(--map-ground),0 0 3px var(--map-ground)}
+.gllabel.main{color:#fff;background:var(--gl);padding:3px 6px;border-radius:3px;text-shadow:none;font-family:var(--font-ui)}
+.tip{position:absolute;pointer-events:none;transform:translate(-50%,calc(-100% - 16px));background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:6px;padding:6px 9px;font-size:12px;white-space:nowrap}
+.tip small{display:block;color:var(--ink-2);font-size:11px}
+
+/* search card + chips (Wheelmap layout) */
+.searchbar{position:absolute;top:10px;left:max(10px,env(safe-area-inset-left,0px));width:min(330px,calc(100% - 20px));display:flex;align-items:center;gap:8px;height:38px;padding:0 10px 0 12px;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);z-index:3}
+.searchbar input{flex:1;min-width:0;border:0;background:transparent;outline:none;font-size:14px}
+.searchbar input::placeholder{color:var(--ink-2)}
+.chips{position:absolute;top:16px;left:calc(min(330px,100% - 20px) + 26px);right:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:2;pointer-events:none}
+.chip{pointer-events:auto;display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap}
+.chip .g{font-size:11px;font-weight:700;color:var(--ink-2)}
+.chip[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--primary-ink)}
+.chip[aria-pressed="true"] .g{color:var(--primary-ink)}
+.app.split .chips{display:none}
+
+.sidetab{position:absolute;left:0;top:50%;transform:translateY(-50%);width:18px;height:46px;border:1px solid var(--line);border-left:0;border-radius:0 6px 6px 0;background:var(--surface);box-shadow:var(--shadow);display:grid;place-items:center;cursor:pointer;z-index:3;padding:0}
+.zoom{position:absolute;right:max(10px,env(safe-area-inset-right,0px));bottom:34px;display:grid;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);overflow:hidden;z-index:3}
+.zoom button{width:30px;height:30px;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;font-size:17px;line-height:1}
+.zoom button+button{border-top:1px solid var(--line)}
+.zoom button:hover{background:var(--surface-2)}
+.attrib{position:absolute;right:0;bottom:0;font-size:10.5px;color:var(--ink-2);background:color-mix(in srgb,var(--surface) 80%,transparent);padding:2px 6px;border-top-left-radius:4px;z-index:3}
+.attrib a{color:inherit}
+.mode-tag{position:absolute;top:10px;left:max(10px,env(safe-area-inset-left,0px));font-size:12px;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 9px;box-shadow:var(--shadow);z-index:3;display:none;gap:6px;align-items:center}
+.mode-tag b{font-family:var(--font-mono);color:var(--floor-hl)}
+.app.split .view3d .mode-tag{display:flex}
+.app.split .view3d .searchbar{display:none}
+
+.legend{position:absolute;left:max(10px,env(safe-area-inset-left,0px));bottom:26px;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:10px 12px;display:grid;gap:7px;font-size:12px;width:min(300px,calc(100% - 70px));z-index:2}
+.legend .row{display:flex;flex-wrap:wrap;gap:4px 12px}
+.legend .row span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.legend .bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden}
+.legend .bar i{display:block;height:100%;background:var(--floor-hl)}
+.legend small{color:var(--ink-2);font-size:11px;line-height:1.5}
+.app.split .legend{display:none}
+.howto{position:absolute;right:52px;bottom:34px;background:var(--primary);color:var(--primary-ink);border-radius:8px;padding:8px 11px;font-size:12px;line-height:1.5;box-shadow:var(--shadow);max-width:250px;z-index:2}
+.app.split .howto{display:none}
+
+.drawer{position:absolute;top:0;left:0;bottom:0;width:min(340px,90%);background:var(--surface);border-right:1px solid var(--line);box-shadow:var(--shadow);transform:translateX(-102%);transition:transform .3s ease;z-index:6;display:grid;grid-template-rows:auto auto 1fr}
+.drawer.open{transform:none}
+.drawer header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line);font-weight:700}
+.drawer .count{padding:8px 14px;font-size:12px;color:var(--ink-2);border-bottom:1px solid var(--line)}
+.drawer ul{list-style:none;margin:0;padding:4px 0;overflow:auto}
+.drawer button.item{width:100%;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;text-align:left;border:0;background:none;padding:7px 14px;cursor:pointer}
+.drawer button.item:hover{background:var(--surface-2)}
+.drawer .item span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drawer .item small{display:block;color:var(--ink-2);font-size:11px}
+.drawer .item em{font-style:normal;font:500 11px var(--font-mono);color:var(--ink-2)}
+
+/* 2D panel */
+.plan{min-width:0;min-height:0;overflow:hidden;background:var(--surface);border-left:1px solid var(--line);display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.plan-head{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);min-width:0}
+.plan-head .t{min-width:0;flex:1}
+.plan-head h2{margin:0;font-size:14.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plan-head p{margin:2px 0 0;font-size:11.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plan-body{display:grid;grid-template-columns:56px minmax(0,1fr);min-height:0}
+.floors{display:flex;flex-direction:column;gap:4px;padding:8px 7px;border-right:1px solid var(--line);overflow:auto;background:var(--surface-2)}
+.floors .cap{font-size:10px;color:var(--ink-2);text-align:center;letter-spacing:.04em}
+.floors button{position:relative;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font:600 11.5px var(--font-mono);cursor:pointer;flex:none}
+.floors button[aria-current="true"]{background:var(--floor-hl);color:#fff;border-color:var(--floor-hl)}
+.floors button .dot{position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--s-limited)}
+.floors .gl{flex:none;display:flex;align-items:center;gap:3px;font:700 9.5px/1 var(--font-ui);color:var(--gl);margin:1px -2px}
+.floors .gl::before,.floors .gl::after{content:"";flex:1;height:2px;background:var(--gl)}
+.floors button.noindoor{color:var(--ink-2);font-weight:500}
+.svgwrap{position:relative;min-width:0;min-height:0;background:var(--map-ground);overflow:hidden}
+.svgwrap svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+.svgwrap .mode-tag{display:flex}
+.plan-note{position:absolute;left:10px;right:10px;bottom:10px;font-size:12px;background:var(--surface);border:1px dashed var(--line-strong);border-radius:6px;padding:7px 10px;color:var(--ink-2);line-height:1.5}
+.card{border-top:1px solid var(--line);padding:12px 14px 14px;display:grid;gap:10px;max-height:44vh;overflow:auto}
+.card h3{margin:0;font-size:17px;font-weight:700;text-wrap:balance}
+.card .sub{margin:2px 0 0;color:var(--ink-2);font-size:12.5px}
+.acc{display:grid;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.acc div{display:grid;grid-template-columns:22px 1fr;gap:8px;padding:8px 10px;align-items:start}
+.acc div+div{border-top:1px solid var(--line)}
+.acc b{display:block;font-size:13px}
+.acc span{font-size:12px;color:var(--ink-2);line-height:1.5}
+.acc .warn b{color:var(--s-no)}
+.xyz{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.xyz div{background:var(--surface-2);border-radius:6px;padding:6px 8px;min-width:0}
+.xyz span{display:block;font:600 10px var(--font-mono);color:var(--ink-2);letter-spacing:.04em}
+.xyz strong{display:block;font:500 12px var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xyz .z strong{color:var(--floor-hl)}
+details.tags summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--ink-2)}
+details.tags pre{margin:6px 0 0;font:12px/1.6 var(--font-mono);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;overflow-x:auto;white-space:pre}
+details.tags .k{color:var(--ink-2)}
+.links{display:flex;flex-wrap:wrap;gap:8px}
+.links a{display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 12px;border-radius:5px;background:var(--primary-soft);color:var(--primary);font-size:12.5px;font-weight:600;text-decoration:none}
+:root[data-theme="dark"] .links a{color:#c8d2ff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .links a{color:#c8d2ff}}
+.links a.primary{background:var(--primary);color:var(--primary-ink)}
+.err{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--ink-2)}
+
+/* Desktop-only layout: the app keeps a fixed minimum size and the window scrolls if it is smaller. */
+html,body{overflow:auto}
+.app{min-width:1200px;min-height:720px}
+@media (prefers-reduced-motion: reduce){.stage,.drawer{transition:none}}
+</style>
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7l9 5 9-5-9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg></div>
+      <b>新宿駅 立体アクセシビリティ</b><span class="badge">非公式モックアップ</span>
+    </div>
+    <button class="pill" type="button" id="pill">何を探していますか？<i><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="4.5" r="1.6" fill="#fff"/><path d="M5 8.5h14M12 8.5v5m0 0-3 7m3-7 3 7"/></svg></i></button>
+    <div class="tools">
+      <button class="ibtn" type="button" id="themeBtn" title="ダークモード切り替え" aria-label="ダークモード切り替え"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg></button>
+      <button class="ibtn" type="button" id="menuBtn" title="地物一覧" aria-label="地物一覧を開く"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <section class="view3d" id="view3d" aria-label="3D全体表示">
+      <canvas id="gl"></canvas>
+      <div class="labels" id="labels"></div>
+      <label class="searchbar"><input id="q" type="search" placeholder="場所または施設名を検索する" autocomplete="off"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></label>
+      <div class="chips" id="chips"></div>
+      <div class="mode-tag"><b>3D</b> 全体：建物と階（Z）を把握</div>
+      <button class="sidetab" id="sidetab" type="button" aria-label="地物一覧を開く"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg></button>
+      <div class="legend" id="legend"></div>
+      <div class="howto">ドラッグで移動、右ドラッグ（2本指）で回転。ピンを選ぶと、右側にその階の2D平面図が開きます。</div>
+      <div class="zoom">
+        <button type="button" id="zin" aria-label="拡大">+</button>
+        <button type="button" id="zout" aria-label="縮小">−</button>
+        <button type="button" id="zorbit" hidden></button>
+        <button type="button" id="zreset" aria-label="全体表示に戻る" title="全体表示に戻る"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3 7 14h10L12 3Z" fill="currentColor"/><path d="M12 14v7"/></svg></button>
+      </div>
+      <div class="attrib">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors（ODbL）・取得 <span id="dataDate"></span></div>
+      <aside class="drawer" id="drawer" aria-label="地物一覧">
+        <header><span>地物一覧</span><button class="ibtn" id="closeList" type="button" aria-label="一覧を閉じる">✕</button></header>
+        <div class="count" id="listCount"></div>
+        <ul id="list"></ul>
+      </aside>
+    </section>
+
+    <section class="plan" id="plan" aria-label="2D詳細表示" hidden>
+      <div class="plan-head">
+        <div class="t"><h2 id="planTitle"></h2><p id="planSub"></p></div>
+        <button class="ibtn" id="close" type="button" aria-label="詳細を閉じて3D全体表示に戻る" title="閉じる（Esc）">✕</button>
+      </div>
+      <div class="plan-body">
+        <div class="floors" id="floors"></div>
+        <div class="svgwrap">
+          <svg id="planSvg" role="img" aria-label="階の平面図"></svg>
+          <div class="mode-tag"><b>2D</b> 詳細：階内の位置（X・Y）を確定</div>
+          <div class="plan-note" id="planNote" hidden></div>
+        </div>
+      </div>
+      <div class="card" id="card"></div>
+    </section>
+  </div>
+</div>
+
+<script id="osm" type="application/json">/*__DATA__*/</script>
+<script id="roads" type="application/json">/*__ROADS__*/</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const D=JSON.parse(document.getElementById('osm').textContent);
+const ROADS=JSON.parse(document.getElementById('roads').textContent);
+// Vertical exaggeration: heights (floors and buildings) are drawn VEX times taller than reality so floors separate clearly.
+const VEX=2.5, FLOOR_M=4.0, H=FLOOR_M*VEX, WIN=75;
+const [LAT0,LON0]=D.o, M_LAT=111320, M_LON=111320*Math.cos(LAT0*Math.PI/180);
+document.getElementById('dataDate').textContent=D.date;
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const STATUS={yes:{label:'全面',long:'車椅子で全面的に利用可',shape:'circle',col:'#46a758'},limited:{label:'一部',long:'車椅子で一部利用可',shape:'hex',col:'#ffba18'},no:{label:'非対応',long:'車椅子では利用不可',shape:'square',col:'#ce2c31'},unknown:{label:'不明',long:'車椅子での利用可否は未登録',shape:'diamond',col:'#7a7a7a'}};
+const CATS={shopping:{label:'ショッピング',g:'買'},food:{label:'食事＆ドリンク',g:'食'},transport:{label:'交通',g:'駅'},toilets:{label:'トイレ',g:'WC'},elevator:{label:'エレベーター',g:'EV'},entrance:{label:'出入口',g:'入'},other:{label:'その他',g:'・'}};
+const SUB={convenience:'コンビニ',department_store:'百貨店',electronics:'家電量販店',clothes:'衣料品店',supermarket:'スーパー',books:'書店',shoes:'靴店',cosmetics:'化粧品店',chemist:'ドラッグストア',mall:'ショッピングモール',bag:'かばん店',jewelry:'宝飾店',gift:'ギフト',confectionery:'菓子店',bakery:'パン屋',mobile_phone:'携帯電話店',optician:'眼鏡店',
+  restaurant:'レストラン',cafe:'カフェ',fast_food:'ファストフード',bar:'バー',pub:'居酒屋・パブ',food_court:'フードコート',toilets:'トイレ',bank:'銀行',atm:'ATM',pharmacy:'薬局',parking:'駐車場',post_office:'郵便局',police:'交番',theatre:'劇場',cinema:'映画館',bus_station:'バスターミナル',taxi:'タクシー乗り場',clinic:'クリニック',hotel:'ホテル',information:'案内所',ticket:'切符売り場'};
+
+function parseLevels(s){
+  if(!s) return [];
+  const out=new Set();
+  String(s).split(';').forEach(t=>{t=t.trim();const m=t.match(/^(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)$/);
+    if(m){let a=+m[1],b=+m[2];if(a>b)[a,b]=[b,a];for(let k=Math.ceil(a);k<=b;k++)out.add(k);}
+    else if(t!==''&&!isNaN(+t))out.add(+t);});
+  return [...out].sort((a,b)=>a-b);
+}
+const lvName=L=>L<0?`B${-L}F`:`${L+1}F`;
+
+/* ---------- data model ---------- */
+const POIS=D.p.map(([id,x,z,t])=>{
+  let cat='other';
+  if(t.highway==='elevator')cat='elevator';
+  else if(t.amenity==='toilets')cat='toilets';
+  else if(t.entrance)cat='entrance';
+  else if(t.railway||t.public_transport||/^(bus_station|taxi|ticket)$/.test(t.amenity||''))cat='transport';
+  else if(/^(restaurant|cafe|fast_food|bar|pub|food_court|ice_cream)$/.test(t.amenity||''))cat='food';
+  else if(t.shop)cat='shopping';
+  const w=t.wheelchair||(cat==='toilets'?t['toilets:wheelchair']:null);
+  const st=(w==='yes'||w==='designated')?'yes':w==='limited'?'limited':w==='no'?'no':'unknown';
+  const levels=[...new Set([...parseLevels(t.level),...parseLevels(t.repeat_on)])].sort((a,b)=>a-b);
+  const kind=SUB[t.shop]||SUB[t.amenity]||(t.railway==='station'?'駅':t.railway==='subway_entrance'?'地下鉄出入口':t.railway==='train_station_entrance'?'駅出入口':null)||CATS[cat].label;
+  const name=t.name||t['name:en']||(t.ref?`${kind} ${t.ref}`:kind);
+  return {id,x,z,t,cat,st,levels,hasLevel:levels.length>0,name,kind};
+});
+const BLD=D.b.map(([id,name,lv,h,ml,mh,ug,part,c])=>{
+  const pts=[];for(let i=0;i<c.length;i+=2)pts.push([c[i],c[i+1]]);
+  const levels=parseFloat(lv)||0, height=parseFloat(h)||(levels?levels*3.6:9), base=parseFloat(mh)||((parseFloat(ml)||0)*3.6);
+  let minx=1e9,minz=1e9,maxx=-1e9,maxz=-1e9,a=0,cx=0,cz=0;
+  pts.forEach(([x,z],i)=>{minx=Math.min(minx,x);maxx=Math.max(maxx,x);minz=Math.min(minz,z);maxz=Math.max(maxz,z);const [x2,z2]=pts[(i+1)%pts.length];const f=x*z2-x2*z;a+=f;cx+=(x+x2)*f;cz+=(z+z2)*f;});
+  a/=2;const area=Math.abs(a);if(area>0){cx/=6*a;cz/=6*a;}else{cx=(minx+maxx)/2;cz=(minz+maxz)/2;}
+  return {id,name,levels,ug:parseFloat(ug)||0,height:Math.max(height,base+3),base,part:!!part,pts,minx,minz,maxx,maxz,area,cx,cz};
+});
+const INDOOR=D.i.map(([kind,lv,name,sub,c])=>{
+  const pts=[];for(let i=0;i<c.length;i+=2)pts.push([c[i],c[i+1]]);
+  let minx=1e9,minz=1e9,maxx=-1e9,maxz=-1e9;pts.forEach(([x,z])=>{minx=Math.min(minx,x);maxx=Math.max(maxx,x);minz=Math.min(minz,z);maxz=Math.max(maxz,z);});
+  const closed=pts.length>3&&pts[0][0]===pts[pts.length-1][0]&&pts[0][1]===pts[pts.length-1][1];
+  return {kind,levels:parseLevels(lv),name,sub,pts,closed,minx,minz,maxx,maxz};
+});
+function pip(x,z,pts){let ins=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const [xi,zi]=pts[i],[xj,zj]=pts[j];if(((zi>z)!==(zj>z))&&(x<(xj-xi)*(z-zi)/(zj-zi)+xi))ins=!ins;}return ins;}
+POIS.forEach(p=>{let best=null;BLD.forEach(b=>{if(b.part||p.x<b.minx||p.x>b.maxx||p.z<b.minz||p.z>b.maxz)return;if(pip(p.x,p.z,b.pts)&&(!best||b.area<best.area))best=b;});p.bld=best;});
+// extent of the data (ground block) and how deep the underground goes
+const EXT=(()=>{let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;BLD.forEach(b=>{x0=Math.min(x0,b.minx);x1=Math.max(x1,b.maxx);z0=Math.min(z0,b.minz);z1=Math.max(z1,b.maxz);});return{x0:x0-15,x1:x1+15,z0:z0-15,z1:z1+15};})();
+const MIN_LEVEL=Math.max(-7,Math.min(-1,...POIS.flatMap(p=>p.levels).filter(Number.isInteger),...INDOOR.flatMap(f=>f.levels).filter(Number.isInteger)));
+const DEPTH=-MIN_LEVEL*H+2;
+const UNDER=POIS.filter(p=>p.hasLevel&&p.levels.every(l=>l<0)).length;
+const glLabels=[];let stems=null,needles=null;
+const STEM=7;   // pin height above its floor (display units); the needle fills this gap
+const toLatLon=(x,z)=>[LAT0-z/M_LAT,LON0+x/M_LON];
+
+/* ---------- header / chips / legend / list ---------- */
+const app=document.getElementById('app');
+const active=new Set();   // empty = all categories
+const chips=document.getElementById('chips');
+['shopping','food','transport','toilets','elevator','entrance'].forEach(k=>{
+  const b=document.createElement('button');b.type='button';b.className='chip';b.setAttribute('aria-pressed','false');
+  b.innerHTML=`<span class="g">${CATS[k].g}</span>${CATS[k].label}`;
+  b.onclick=()=>{active.has(k)?active.delete(k):active.add(k);b.setAttribute('aria-pressed',active.has(k));refresh();};
+  chips.appendChild(b);
+});
+const visibleCat=p=>active.size===0||active.has(p.cat);
+
+function shapePts(shape,cx,cy,r){
+  if(shape==='hex'){const p=[];for(let i=0;i<6;i++){const a=Math.PI/180*(60*i-90);p.push([cx+r*Math.cos(a),cy+r*Math.sin(a)]);}return p;}
+  if(shape==='diamond')return[[cx,cy-r],[cx+r,cy],[cx,cy+r],[cx-r,cy]];
+}
+function svgShape(st,cx,cy,r,extra=''){
+  const s=STATUS[st].shape,f=`var(--s-${st})`;
+  if(s==='circle')return`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${f}" ${extra}/>`;
+  if(s==='square')return`<rect x="${cx-r*.85}" y="${cy-r*.85}" width="${r*1.7}" height="${r*1.7}" fill="${f}" ${extra}/>`;
+  return`<polygon points="${shapePts(s,cx,cy,r*1.08).map(p=>p.map(v=>v.toFixed(2)).join(',')).join(' ')}" fill="${f}" ${extra}/>`;
+}
+const mini=(st,s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 20 20" aria-hidden="true">${svgShape(st,10,10,7.5,'stroke="var(--surface)" stroke-width="1.5"')}</svg>`;
+
+(function legend(){
+  const cnt={yes:0,limited:0,no:0,unknown:0};POIS.forEach(p=>cnt[p.st]++);
+  const withLv=POIS.filter(p=>p.hasLevel).length, pct=Math.round(withLv/POIS.length*100);
+  const indoorLv=new Set();INDOOR.forEach(f=>f.levels.forEach(l=>indoorLv.add(l)));
+  document.getElementById('legend').innerHTML=`
+    <div class="row">${Object.keys(STATUS).map(k=>`<span>${mini(k)}${STATUS[k].label} ${cnt[k]}</span>`).join('')}</div>
+    <div><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>階情報（level）のある地物</span><b style="font-variant-numeric:tabular-nums">${withLv} / ${POIS.length}（${pct}%）</b></div><div class="bar"><i style="width:${pct}%"></i></div></div>
+    <div class="row"><span style="white-space:normal;align-items:flex-start;line-height:1.45"><svg style="flex:none;margin-top:2px" width="22" height="12" viewBox="0 0 22 12" aria-hidden="true"><rect x="0" y="0" width="22" height="3" fill="var(--gl)"/><rect x="0" y="3" width="22" height="9" fill="var(--earth)" opacity=".45"/><line x1="11" y1="3" x2="11" y2="10" stroke="var(--gl)" stroke-width="1.5"/></svg>茶色の線が地面（GL）。下は地下の断面で、地下の地物 ${UNDER}件は地面まで縦線で示します</span></div>
+    <div class="row"><span style="white-space:normal;align-items:flex-start;line-height:1.45"><svg style="flex:none;margin-top:1px" width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M11 1v12M8 4l3-3 3 3M8 10l3 3 3-3" fill="none" stroke="var(--floor-hl)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>階の違いが分かるよう、高さ（建物・階の間隔）を実際の${VEX}倍に強調しています</span></div>
+    <small>OpenStreetMapの実データ（新宿駅周辺 約0.9km四方）。屋内図は ${(()=>{const a=[...indoorLv].filter(Number.isInteger).sort((x,y)=>x-y);return a.length?`${lvName(a[0])}〜${lvName(a[a.length-1])}`:'—';})()} の範囲に ${INDOOR.length}件あります。記号はWheelmapの信号システムに合わせています。</small>`;
+})();
+
+const drawer=document.getElementById('drawer'),list=document.getElementById('list'),q=document.getElementById('q');
+function renderList(){
+  const s=q.value.trim().toLowerCase();
+  let ps=POIS.filter(p=>visibleCat(p)&&(!s||p.name.toLowerCase().includes(s)||(p.t['name:en']||'').toLowerCase().includes(s)||p.kind.includes(s)));
+  ps.sort((a,b)=>(a.st==='unknown')-(b.st==='unknown')||(b.hasLevel-a.hasLevel)||a.name.localeCompare(b.name,'ja'));
+  document.getElementById('listCount').textContent=`${ps.length}件${ps.length>200?'（先頭200件を表示）':''}${s?`・「${q.value}」で検索`:''}`;
+  list.innerHTML='';
+  ps.slice(0,200).forEach(p=>{
+    const li=document.createElement('li');
+    li.innerHTML=`<button class="item" type="button">${mini(p.st,16)}<span>${esc(p.name)}<small>${esc(p.kind)}${p.bld&&p.bld.name?'・'+esc(p.bld.name):''}</small></span><em>${p.hasLevel?p.levels.map(lvName).join('・'):'階不明'}</em></button>`;
+    li.firstChild.onclick=()=>{drawer.classList.remove('open');select(p,defaultLevel(p));};
+    list.appendChild(li);
+  });
+}
+const openList=()=>{renderList();drawer.classList.add('open');};
+document.getElementById('sidetab').onclick=openList;
+document.getElementById('menuBtn').onclick=openList;
+document.getElementById('pill').onclick=()=>{openList();q.focus();};
+document.getElementById('closeList').onclick=()=>drawer.classList.remove('open');
+q.addEventListener('input',()=>{if(q.value.trim())openList();else renderList();});
+q.addEventListener('keydown',e=>{if(e.key==='Enter'){const b=list.querySelector('button.item');if(b)b.click();}});
+document.getElementById('themeBtn').onclick=()=>{
+  const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
+  r.dataset.theme=dark?'light':'dark';
+};
+
+/* ---------- 3D ---------- */
+const view3d=document.getElementById('view3d'),canvas=document.getElementById('gl'),labelsEl=document.getElementById('labels');
+let renderer,scene,camera,controls;
+try{renderer=new THREE.WebGLRenderer({canvas,antialias:true});}catch(e){view3d.insertAdjacentHTML('beforeend','<div class="err">この環境では3D表示（WebGL）を利用できません。左の「›」から地物一覧を開くと2D平面図を確認できます。</div>');}
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const state={poi:null,level:null};
+const sprites=[];let mats={},bldMesh,bldEdges,ground,selGroup,levelPlane;
+
+const iconCache={};
+function iconTex(st,g){
+  const k=st+g;if(iconCache[k])return iconCache[k];
+  const c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d'),sh=STATUS[st].shape;
+  x.shadowColor='rgba(0,0,0,.3)';x.shadowBlur=6;x.shadowOffsetY=2;x.beginPath();
+  if(sh==='circle')x.arc(48,48,34,0,Math.PI*2);else if(sh==='square')x.rect(19,19,58,58);else shapePts(sh,48,48,sh==='hex'?38:40).forEach((p,i)=>i?x.lineTo(...p):x.moveTo(...p));
+  x.closePath();x.fillStyle=STATUS[st].col;x.fill();x.shadowColor='transparent';x.lineWidth=5;x.strokeStyle='#fff';x.stroke();
+  x.fillStyle=st==='limited'?'#3a2a00':'#fff';x.font=`700 ${g.length>1?26:32}px Inter,"Noto Sans JP",sans-serif`;x.textAlign='center';x.textBaseline='middle';x.fillText(g,48,50);
+  const t=new THREE.CanvasTexture(c);iconCache[k]=t;return t;
+}
+function shapeFrom(pts){const s=new THREE.Shape();pts.forEach(([x,z],i)=>i?s.lineTo(x,-z):s.moveTo(x,-z));return s;}
+
+function build(){
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(40,1,2,6000);
+  controls=new THREE.OrbitControls(camera,canvas);
+  controls.enableDamping=true;controls.dampingFactor=.09;controls.screenSpacePanning=false;
+  controls.maxPolarAngle=Math.PI*.46;controls.minDistance=40;controls.maxDistance=2600;
+  controls.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.ROTATE};
+  controls.touches={ONE:THREE.TOUCH.PAN,TWO:THREE.TOUCH.DOLLY_ROTATE};
+  controls.autoRotateSpeed=1.6;   // about 37 s per turn
+  controls.addEventListener('start',()=>{userActive=true;});
+  controls.addEventListener('end',()=>{userActive=false;userAt=performance.now();});
+  scene.add(new THREE.HemisphereLight(0xffffff,0x9aa0aa,.85));
+  const sun=new THREE.DirectionalLight(0xffffff,.5);sun.position.set(-300,600,250);scene.add(sun);
+
+  // ground as a block cut to the data extent, with an earth cross-section below it so the ground line (GL) is visible
+  const {x0,x1,z0,z1}=EXT,gw=x1-x0,gd=z1-z0,depth=DEPTH;
+  mats.ground=new THREE.MeshBasicMaterial({color:0xefede8,transparent:true,opacity:.9,depthWrite:false,side:THREE.DoubleSide});
+  ground=new THREE.Mesh(new THREE.PlaneGeometry(gw,gd),mats.ground);ground.rotation.x=-Math.PI/2;ground.position.set((x0+x1)/2,0,(z0+z1)/2);ground.renderOrder=-3;scene.add(ground);
+  mats.earth=new THREE.MeshBasicMaterial({color:0xb98a5a,transparent:true,opacity:.22,depthWrite:false,side:THREE.DoubleSide});
+  mats.glBand=new THREE.MeshBasicMaterial({color:0x8a5a2b,side:THREE.DoubleSide});
+  const earth=new THREE.Group();
+  [[gw,(x0+x1)/2,z0,0],[gw,(x0+x1)/2,z1,0],[gd,x0,(z0+z1)/2,Math.PI/2],[gd,x1,(z0+z1)/2,Math.PI/2]].forEach(([w,x,z,ry])=>{
+    const wall=new THREE.Mesh(new THREE.PlaneGeometry(w,depth),mats.earth);wall.position.set(x,-depth/2,z);wall.rotation.y=ry;wall.renderOrder=-4;earth.add(wall);
+    const band=new THREE.Mesh(new THREE.PlaneGeometry(w,1.6),mats.glBand);band.position.set(x,-.8,z);band.rotation.y=ry;band.renderOrder=-1;earth.add(band); // thick ground line
+  });
+  const bottom=new THREE.Mesh(new THREE.PlaneGeometry(gw,gd),mats.earth);bottom.rotation.x=-Math.PI/2;bottom.position.set((x0+x1)/2,-depth,(z0+z1)/2);bottom.renderOrder=-4;earth.add(bottom);
+  // basement level lines on the section walls
+  const ll=[],loop=y=>{const c=[[x0,z0],[x1,z0],[x1,z1],[x0,z1],[x0,z0]];for(let i=0;i<4;i++)ll.push(c[i][0],y,c[i][1],c[i+1][0],y,c[i+1][1]);};
+  for(let L=-1;L*H>-depth;L--)loop(L*H);
+  [[x0,z0],[x1,z0],[x1,z1],[x0,z1]].forEach(([x,z])=>ll.push(x,0,z,x,-depth,z));
+  const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.Float32BufferAttribute(ll,3));
+  mats.earthLine=new THREE.LineBasicMaterial({color:0x8a5a2b,transparent:true,opacity:.55});
+  earth.add(new THREE.LineSegments(lg,mats.earthLine));
+  scene.add(earth);
+  // labels on the near-left corner: GL and each basement level
+  // GL / underground labels follow the corner nearest to the camera (placed every frame)
+  [['地面（GL±0m）',0,' main'],[`地下（〜${lvName(MIN_LEVEL)}・約${-MIN_LEVEL*FLOOR_M}m）`,-depth/2,'']].forEach(([t,y,cls])=>{
+    const el=document.createElement('div');el.className='gllabel'+cls;el.textContent=t;labelsEl.appendChild(el);glLabels.push({el,y});
+  });
+  stems=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x8a5a2b,transparent:true,opacity:.6}));stems.renderOrder=8;scene.add(stems);
+
+  // roads as flat ribbons
+  const rp=[],rr=[];
+  ROADS.forEach(([k,w,c])=>{
+    const target=k==='rail'?rr:rp;
+    for(let i=0;i+3<c.length;i+=2){
+      const x1=c[i],z1=c[i+1],x2=c[i+2],z2=c[i+3],dx=x2-x1,dz=z2-z1,L=Math.hypot(dx,dz)||1,nx=-dz/L*w/2,nz=dx/L*w/2;
+      target.push(x1+nx,0,z1+nz, x2+nx,0,z2+nz, x2-nx,0,z2-nz, x1+nx,0,z1+nz, x2-nx,0,z2-nz, x1-nx,0,z1-nz);
+    }
+  });
+  const mk=(arr,mat,ro)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(arr,3));const m=new THREE.Mesh(g,mat);m.renderOrder=ro;m.position.y=.05;scene.add(m);return m;};
+  mats.road=new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide,transparent:true,depthWrite:false});
+  mats.rail=new THREE.MeshBasicMaterial({color:0xb9b4ab,side:THREE.DoubleSide,transparent:true,depthWrite:false});
+  mk(rp,mats.road,-2);mk(rr,mats.rail,-1);
+
+  // buildings merged into one mesh + one edge set
+  const pos=[],nor=[],epos=[];
+  BLD.forEach(b=>{
+    if(b.pts.length<3)return;
+    try{
+      const g=new THREE.ExtrudeGeometry(shapeFrom(b.pts),{depth:(b.height-b.base)*VEX,bevelEnabled:false});
+      g.rotateX(-Math.PI/2);g.translate(0,b.base*VEX,0);
+      const ng=g.index?g.toNonIndexed():g;
+      pos.push(...ng.attributes.position.array);nor.push(...ng.attributes.normal.array);
+      const e=new THREE.EdgesGeometry(g,35);epos.push(...e.attributes.position.array);
+      g.dispose();e.dispose();
+    }catch(err){}
+  });
+  const bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));bg.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));
+  mats.bldg=new THREE.MeshLambertMaterial({color:0xe3ded6,transparent:true,opacity:.96});
+  bldMesh=new THREE.Mesh(bg,mats.bldg);bldMesh.renderOrder=1;scene.add(bldMesh);
+  const eg=new THREE.BufferGeometry();eg.setAttribute('position',new THREE.Float32BufferAttribute(epos,3));
+  mats.edge=new THREE.LineBasicMaterial({color:0xc9c2b6,transparent:true,opacity:.9});
+  bldEdges=new THREE.LineSegments(eg,mats.edge);bldEdges.renderOrder=2;scene.add(bldEdges);
+
+  // pins
+  POIS.forEach(p=>{
+    const lv=p.cat==='elevator'&&p.hasLevel?[p.levels[p.levels.length-1]]:(p.hasLevel?p.levels:[null]);
+    lv.forEach(L=>{
+      const m=new THREE.SpriteMaterial({map:iconTex(p.st,CATS[p.cat].g),depthTest:false,transparent:true,sizeAttenuation:false});
+      const s=new THREE.Sprite(m);s.center.set(.5,.1);
+      const base=L==null?0:L*H;   // floor height the pin points at
+      s.position.set(p.x,base+STEM,p.z);s.renderOrder=20;s.userData={p,L,base};scene.add(s);sprites.push(s);
+    });
+  });
+  // pin needles: a vertical line from each pin down to its floor, with a dot where it touches the floor
+  const mkNeedle=op=>{const l=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:op,depthTest:false}));l.renderOrder=18;scene.add(l);
+    const d=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({size:4,sizeAttenuation:false,vertexColors:true,transparent:true,opacity:op,depthTest:false}));d.renderOrder=18;scene.add(d);return{l,d};};
+  needles={strong:mkNeedle(.95),dim:mkNeedle(.22)};
+  selGroup=new THREE.Group();scene.add(selGroup);
+
+  // labels: biggest named buildings
+  BLD.filter(b=>b.name&&!b.part).sort((a,b)=>b.area-a.area).slice(0,14).forEach(b=>{const d=document.createElement('div');d.className='blabel';d.textContent=b.name;labelsEl.appendChild(d);b.labelEl=d;});
+  theme();
+}
+
+function theme(){
+  if(!scene)return;
+  const c=n=>new THREE.Color(css(n));
+  scene.background=c('--map-ground');mats.ground.color=c('--map-ground');mats.road.color=c('--map-road');mats.rail.color=c('--map-rail');
+  mats.bldg.color=c('--map-bldg');mats.edge.color=c('--map-edge');
+  mats.earth.color=c('--earth');mats.glBand.color=c('--gl');mats.earthLine.color=c('--gl');stems.material.color=c('--gl');
+  if(state.poi)drawSelection();
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',theme);
+new MutationObserver(()=>{theme();if(state.poi)renderPlan();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+function refresh(){
+  if(scene){
+    const sel=state.poi;
+    sprites.forEach(s=>{
+      const {p,L}=s.userData;s.visible=visibleCat(p)||p===sel;
+      let op=1,sc=p.st==='unknown'?.022:.03;
+      if(sel){
+        const near=Math.hypot(p.x-sel.x,p.z-sel.z)<WIN*1.2;
+        const onLv=p.cat==='elevator'?p.levels.includes(state.level):(L===state.level||(L==null&&state.level===0));
+        op=!near?.12:onLv?1:.3;
+        if(p===sel){sc=.05;op=1;}
+      }else if(L!=null&&L<0)op=.7;   // underground pins read as "below the surface"
+      s.material.opacity=op;s.userData.sc=sc;
+    });
+    lastF=-1;
+    // vertical stems from every visible underground floor point up to the ground line
+    const st=[];sprites.forEach(s=>{const {p,L}=s.userData;if(!s.visible||L==null||L>=0)return;if(sel&&Math.hypot(p.x-sel.x,p.z-sel.z)>WIN*1.2)return;st.push(p.x,L*H,p.z,p.x,0,p.z);});
+    stems.geometry.dispose();stems.geometry=new THREE.BufferGeometry();stems.geometry.setAttribute('position',new THREE.Float32BufferAttribute(st,3));
+    // pin needles, split into a strong and a dimmed set to follow the pin opacity
+    const nd={strong:{p:[],c:[],dp:[],dc:[]},dim:{p:[],c:[],dp:[],dc:[]}},col=new THREE.Color();
+    sprites.forEach(s=>{if(!s.visible)return;const {p,base}=s.userData,o=s.material.opacity,g=o>=.6?nd.strong:nd.dim;col.set(STATUS[p.st].col);
+      g.p.push(p.x,base,p.z,p.x,base+STEM,p.z);g.c.push(col.r,col.g,col.b,col.r,col.g,col.b);g.dp.push(p.x,base,p.z);g.dc.push(col.r,col.g,col.b);});
+    ['strong','dim'].forEach(k=>{const n=needles[k],g=nd[k];
+      n.l.geometry.dispose();n.l.geometry=new THREE.BufferGeometry();n.l.geometry.setAttribute('position',new THREE.Float32BufferAttribute(g.p,3));n.l.geometry.setAttribute('color',new THREE.Float32BufferAttribute(g.c,3));
+      n.d.geometry.dispose();n.d.geometry=new THREE.BufferGeometry();n.d.geometry.setAttribute('position',new THREE.Float32BufferAttribute(g.dp,3));n.d.geometry.setAttribute('color',new THREE.Float32BufferAttribute(g.dc,3));});
+    mats.bldg.opacity=sel?.16:.96;mats.bldg.depthWrite=!sel;mats.edge.opacity=sel?.35:.9;
+    const under=sel&&state.level<0;
+    mats.ground.opacity=under?.3:.9;mats.earth.opacity=under?.3:.22;
+  }
+  if(drawer.classList.contains('open'))renderList();
+}
+
+let tween=null,lastF=-1,orbitOn=!reduceMotion,userActive=false,userAt=0;
+const orbitBtn=document.getElementById('zorbit');
+function syncOrbitBtn(){orbitBtn.hidden=!state.poi;orbitBtn.setAttribute('aria-pressed',orbitOn);const lab=orbitOn?'回転を止める':'地点の周りを回転する';orbitBtn.title=lab;orbitBtn.setAttribute('aria-label',lab);
+  orbitBtn.innerHTML=orbitOn?'<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg>';}
+orbitBtn.onclick=()=>{orbitOn=!orbitOn;userAt=0;syncOrbitBtn();};
+function flyTo(t,p){if(!controls)return;if(reduceMotion){controls.target.copy(t);camera.position.copy(p);return;}tween={t0:performance.now(),dur:800,ft:controls.target.clone(),fp:camera.position.clone(),tt:t,tp:p};}
+const OVER={t:new THREE.Vector3(40,0,10),p:new THREE.Vector3(-420,760,860)};
+function focus(p,L){
+  const t=new THREE.Vector3(p.x,L*H,p.z);
+  const dir=camera.position.clone().sub(controls.target);dir.y=0;if(dir.length()<1)dir.set(-.4,0,1);dir.normalize();
+  const dist=380;flyTo(t,t.clone().add(dir.multiplyScalar(dist*Math.cos(.7))).add(new THREE.Vector3(0,dist*Math.sin(.7),0)));
+}
+
+function clearGroup(g){while(g.children.length){const c=g.children.pop();c.geometry&&c.geometry.dispose();c.material&&c.material.dispose();}}
+function nearIndoor(p,L){return INDOOR.filter(f=>f.levels.includes(L)&&f.maxx>p.x-WIN*1.4&&f.minx<p.x+WIN*1.4&&f.maxz>p.z-WIN*1.4&&f.minz<p.z+WIN*1.4);}
+function drawSelection(){
+  if(!scene)return;clearGroup(selGroup);
+  const p=state.poi,L=state.level,y=L*H,hl=new THREE.Color(css('--floor-hl'));
+  // level plane (Z indicator)
+  const plane=new THREE.Mesh(new THREE.PlaneGeometry(WIN*2.8,WIN*2.8),new THREE.MeshBasicMaterial({color:hl,transparent:true,opacity:.1,depthWrite:false,side:THREE.DoubleSide}));
+  plane.rotation.x=-Math.PI/2;plane.position.set(p.x,y+.02,p.z);plane.renderOrder=3;selGroup.add(plane);
+  const pe=new THREE.LineSegments(new THREE.EdgesGeometry(plane.geometry),new THREE.LineBasicMaterial({color:hl,transparent:true,opacity:.7}));pe.rotation.copy(plane.rotation);pe.position.copy(plane.position);selGroup.add(pe);
+  // selected building slabs
+  const b=p.bld;
+  if(b&&b.levels){
+    for(let l=-b.ug;l<b.levels;l++){
+      const g=new THREE.ShapeGeometry(shapeFrom(b.pts));g.rotateX(-Math.PI/2);
+      const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:l===L?hl:new THREE.Color(css('--map-bldg')),transparent:true,opacity:l===L?.35:(l<L?.25:.06),depthWrite:false,side:THREE.DoubleSide}));
+      m.position.y=l*H+.01;m.renderOrder=4;selGroup.add(m);
+    }
+  }
+  // indoor features on this level
+  const fills=new THREE.Color(css('--in-corr')),rooms=new THREE.Color(css('--in-room')),wall=new THREE.Color(css('--in-wall'));
+  const lp=[];
+  nearIndoor(p,L).forEach(f=>{
+    if(f.closed&&f.kind!=='wall'){
+      try{const g=new THREE.ShapeGeometry(shapeFrom(f.pts));g.rotateX(-Math.PI/2);
+        const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:f.kind==='room'?rooms:fills,transparent:true,opacity:.75,depthWrite:false,side:THREE.DoubleSide}));
+        m.position.y=y+.06;m.renderOrder=5;selGroup.add(m);}catch(e){}
+    }
+    for(let i=0;i+1<f.pts.length;i++)lp.push(f.pts[i][0],y+.1,f.pts[i][1],f.pts[i+1][0],y+.1,f.pts[i+1][1]);
+  });
+  if(lp.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(lp,3));const l=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:wall,transparent:true,opacity:.8}));l.renderOrder=6;selGroup.add(l);}
+  // vertical guide from ground to the place
+  const vg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p.x,Math.min(0,y),p.z),new THREE.Vector3(p.x,Math.max(0,y)+.8,p.z)]);
+  const vl=new THREE.Line(vg,new THREE.LineDashedMaterial({color:hl,dashSize:1.2,gapSize:.8}));vl.computeLineDistances();vl.renderOrder=7;selGroup.add(vl);
+}
+
+function resize(){if(!renderer)return;const w=view3d.clientWidth,h=view3d.clientHeight;if(!w||!h)return;renderer.setPixelRatio(Math.min(2,devicePixelRatio));renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+
+let floorLabels=[];
+function buildFloorLabels(levels){
+  floorLabels.forEach(f=>f.el.remove());floorLabels=[];
+  if(!state.poi||!renderer)return;
+  levels.forEach(L=>{const el=document.createElement('div');el.className='flabel'+(L===state.level?' on':'');el.textContent=lvName(L);labelsEl.appendChild(el);
+    floorLabels.push({el,y:L*H+H/2});});
+  if(levels.some(l=>l<0)){const el=document.createElement('div');el.className='gllabel main';el.textContent='地面 GL';labelsEl.appendChild(el);
+    floorLabels.push({el,y:0});}
+}
+const tmp=new THREE.Vector3(),tmp2=new THREE.Vector3();
+function proj(v){tmp.copy(v).project(camera);return{x:(tmp.x+1)/2*view3d.clientWidth,y:(1-tmp.y)/2*view3d.clientHeight,hide:tmp.z>1};}
+// pick a point on the box outline (corners and edge midpoints at ground level) that is on screen and nearest the camera
+function anchor(x0,x1,z0,z1){
+  const w=view3d.clientWidth,h=view3d.clientHeight,mx=(x0+x1)/2,mz=(z0+z1)/2;let best=null,bd=1e18;
+  [[x0,z0],[x1,z0],[x1,z1],[x0,z1],[mx,z0],[mx,z1],[x0,mz],[x1,mz]].forEach(([x,z])=>{
+    const q=proj(tmp2.set(x,0,z));if(q.hide||q.x<90||q.x>w-30||q.y<70||q.y>h-60)return;
+    const d=(camera.position.x-x)**2+(camera.position.z-z)**2;if(d<bd){bd=d;best=[x,z];}
+  });
+  return best;
+}
+function place(){
+  BLD.forEach(b=>{if(!b.labelEl)return;const q=proj(new THREE.Vector3(b.cx,b.height*VEX+4,b.cz));b.labelEl.style.display=(q.hide||state.poi)?'none':'block';b.labelEl.style.left=q.x+'px';b.labelEl.style.top=q.y+'px';});
+  if(floorLabels.length){
+    const R=WIN*1.4,p=state.poi,a=anchor(p.x-R,p.x+R,p.z-R,p.z+R);
+    floorLabels.forEach(f=>{if(!a){f.el.style.display='none';return;}const q=proj(tmp2.set(a[0],f.y,a[1]));f.el.style.display=q.hide?'none':'block';f.el.style.left=q.x+'px';f.el.style.top=q.y+'px';});
+  }
+  if(glLabels.length){
+    const a=state.poi?null:anchor(EXT.x0,EXT.x1,EXT.z0,EXT.z1);
+    glLabels.forEach(f=>{if(!a){f.el.style.display='none';return;}const q=proj(tmp2.set(a[0],f.y,a[1]));f.el.style.display=q.hide?'none':'block';f.el.style.left=q.x+'px';f.el.style.top=q.y+'px';});
+  }
+  if(hover){const q=proj(hover.position);tip.style.left=q.x+'px';tip.style.top=q.y+'px';}
+}
+function loop(now){
+  if(tween){const k=Math.min(1,(now-tween.t0)/tween.dur),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;controls.target.lerpVectors(tween.ft,tween.tt,e);camera.position.lerpVectors(tween.fp,tween.tp,e);if(k>=1)tween=null;}
+  // split view: orbit slowly around the selected place; pause while the user drags and for a moment after
+  controls.autoRotate=!!state.poi&&orbitOn&&!tween&&!userActive&&now-userAt>2500;
+  controls.update();
+  // pins shrink to dots when far away, like Wheelmap's low-zoom markers
+  const f=Math.min(1.05,Math.max(.32,330/camera.position.distanceTo(controls.target)));
+  if(Math.abs(f-lastF)>.01){lastF=f;sprites.forEach(s=>{const sc=(s.userData.sc||.03)*(s.userData.p===state.poi?Math.max(f,.9):f);s.scale.set(sc,sc,1);});}
+  renderer.render(scene,camera);place();requestAnimationFrame(loop);
+}
+function dolly(f){const off=camera.position.clone().sub(controls.target).multiplyScalar(f);const len=off.length();if(len<controls.minDistance||len>controls.maxDistance)return;flyTo(controls.target.clone(),controls.target.clone().add(off));}
+document.getElementById('zin').onclick=()=>dolly(.7);
+document.getElementById('zout').onclick=()=>dolly(1.4);
+document.getElementById('zreset').onclick=()=>{if(state.poi)closeSplit();else flyTo(OVER.t.clone(),OVER.p.clone());};
+
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),tip=document.createElement('div');tip.className='tip';tip.hidden=true;labelsEl.appendChild(tip);
+let hover=null,down=null;
+function pick(e){const r=canvas.getBoundingClientRect();mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mouse,camera);
+  const h=ray.intersectObjects(sprites.filter(s=>s.visible&&s.material.opacity>.25));return h.length?h[0].object:null;}
+function initPick(){
+  canvas.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];});
+  canvas.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse'||e.buttons)return;const s=pick(e);hover=s;canvas.style.cursor=s?'pointer':'';
+    if(s){const p=s.userData.p;tip.hidden=false;tip.innerHTML=`${esc(p.name)}<small>${esc(p.kind)}・${STATUS[p.st].label}・${p.hasLevel?p.levels.map(lvName).join('/'):'階不明'}</small>`;}else tip.hidden=true;});
+  canvas.addEventListener('pointerup',e=>{if(!down)return;const mv=Math.hypot(e.clientX-down[0],e.clientY-down[1]);down=null;if(mv>6||e.button!==0)return;const s=pick(e);if(!s)return;const {p,L}=s.userData;
+    select(p,p.cat==='elevator'?(state.poi&&p.levels.includes(state.level)?state.level:defaultLevel(p)):(L==null?0:L));});
+}
+
+/* ---------- selection ---------- */
+const plan=document.getElementById('plan');
+function defaultLevel(p){if(!p.hasLevel)return 0;return p.levels.includes(0)?0:p.levels[0];}
+function levelsNear(p){
+  const s=new Set(p.levels);
+  INDOOR.forEach(f=>{if(f.maxx>p.x-WIN&&f.minx<p.x+WIN&&f.maxz>p.z-WIN&&f.minz<p.z+WIN)f.levels.forEach(l=>s.add(l));});
+  POIS.forEach(q=>{if(Math.abs(q.x-p.x)<WIN&&Math.abs(q.z-p.z)<WIN)q.levels.forEach(l=>s.add(l));});
+  if(p.bld&&p.bld.levels){for(let l=-p.bld.ug;l<Math.min(p.bld.levels,60);l++)s.add(l);}
+  s.add(0);
+  return [...s].filter(Number.isInteger).sort((a,b)=>a-b);
+}
+let floorList=[];
+function select(p,L){
+  state.poi=p;state.level=L;tip.hidden=true;hover=null;
+  plan.hidden=false;app.classList.add('split');syncOrbitBtn();
+  floorList=levelsNear(p);if(!floorList.includes(L))floorList.push(L),floorList.sort((a,b)=>a-b);
+  buildFloorLabels(floorList);refresh();drawSelection();renderPlan(true);
+  if(camera){setTimeout(resize,0);setTimeout(resize,480);focus(p,L);}
+}
+function setLevel(L){state.level=L;buildFloorLabels(floorList);refresh();drawSelection();renderPlan(false);if(camera)focus(state.poi,L);}
+function closeSplit(){
+  state.poi=null;state.level=null;app.classList.remove('split');syncOrbitBtn();buildFloorLabels([]);refresh();if(selGroup)clearGroup(selGroup);
+  setTimeout(()=>{plan.hidden=true;resize();},470);flyTo(OVER.t.clone(),OVER.p.clone());
+}
+document.getElementById('close').onclick=closeSplit;
+addEventListener('keydown',e=>{if(e.key==='Escape'){if(drawer.classList.contains('open'))drawer.classList.remove('open');else if(state.poi)closeSplit();}});
+
+/* ---------- 2D plan ---------- */
+const svg=document.getElementById('planSvg');let vb=null;
+function renderPlan(resetView){
+  const p=state.poi,L=state.level;
+  const indoor=nearIndoor(p,L);
+  document.getElementById('planTitle').textContent=`${p.bld&&p.bld.name?p.bld.name:(p.bld?'建物内':'屋外・周辺')}　${lvName(L)}`;
+  document.getElementById('planSub').textContent=`OSM level=${L}・この範囲の屋内図 ${indoor.length}件・地物 ${POIS.filter(q=>Math.abs(q.x-p.x)<WIN&&Math.abs(q.z-p.z)<WIN&&(q.levels.includes(L)||(!q.hasLevel&&L===0))).length}件`;
+  const fl=document.getElementById('floors');fl.innerHTML='<div class="cap">階</div>';
+  const hasIndoor=new Set();INDOOR.forEach(f=>{if(f.maxx>p.x-WIN&&f.minx<p.x+WIN&&f.maxz>p.z-WIN&&f.minz<p.z+WIN)f.levels.forEach(l=>hasIndoor.add(l));});
+  [...floorList].reverse().forEach(l=>{const b=document.createElement('button');b.type='button';b.textContent=lvName(l);b.setAttribute('aria-current',l===L);
+    if(!hasIndoor.has(l))b.classList.add('noindoor');b.title=hasIndoor.has(l)?`${lvName(l)}（屋内図あり）`:`${lvName(l)}（屋内図なし）`;
+    if(p.levels.includes(l))b.insertAdjacentHTML('beforeend','<span class="dot" aria-hidden="true"></span>');b.onclick=()=>setLevel(l);fl.appendChild(b);
+    if(l===0&&floorList.some(v=>v<0))fl.insertAdjacentHTML('beforeend','<div class="gl" title="ここより下が地下">地面</div>');});
+  setTimeout(()=>{const cur=fl.querySelector('[aria-current="true"]');cur&&cur.scrollIntoView({block:'nearest'});},0);
+
+  if(resetView||!vb)vb=[p.x-WIN*.65,p.z-WIN*.65,WIN*1.3,WIN*1.3];
+  const u=WIN*2/100;let s='';
+  s+=`<rect x="-3000" y="-3000" width="6000" height="6000" fill="var(--map-ground)"/>`;
+  const under=L<0;
+  ROADS.forEach(([k,w,c])=>{const pts=[];for(let i=0;i<c.length;i+=2)pts.push(c[i]+','+c[i+1]);s+=`<polyline points="${pts.join(' ')}" fill="none" stroke="${k==='rail'?'var(--map-rail)':'var(--map-road)'}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" opacity="${under?.45:1}"/>`;});
+  BLD.forEach(b=>{if(b.part||b.maxx<p.x-WIN*2||b.minx>p.x+WIN*2||b.maxz<p.z-WIN*2||b.minz>p.z+WIN*2)return;
+    s+=`<polygon points="${b.pts.map(q=>q.join(',')).join(' ')}" fill="${under?'none':'var(--map-bldg)'}" stroke="var(--map-edge)" stroke-width="${u*.25}" ${under?`stroke-dasharray="${u} ${u}"`:''}/>`;});
+  const order={area:0,corridor:0,footway:0,highway:0,yes:0,room:1,column:2,wall:3,door:3};
+  indoor.slice().sort((a,b)=>(order[a.kind]??1)-(order[b.kind]??1)).forEach(f=>{
+    const pts=f.pts.map(q=>q.join(',')).join(' ');
+    if(f.kind==='wall'||!f.closed)s+=`<polyline points="${pts}" fill="none" stroke="var(--in-wall)" stroke-width="${f.kind==='wall'?u*.35:u*.2}" ${f.kind==='wall'?'':`stroke-dasharray="${u*.8} ${u*.6}"`}/>`;
+    else if(f.kind==='column')s+=`<polygon points="${pts}" fill="var(--in-col)"/>`;
+    else if(f.kind==='room')s+=`<polygon points="${pts}" fill="var(--in-room)" stroke="var(--in-wall)" stroke-width="${u*.22}"/>`;
+    else s+=`<polygon points="${pts}" fill="var(--in-corr)" stroke="var(--line-strong)" stroke-width="${u*.15}"/>`;
+  });
+  indoor.forEach(f=>{if(f.kind!=='room'||!f.name||!f.closed)return;const w=f.maxx-f.minx,h=f.maxz-f.minz;if(w*h<90)return;
+    const fs=Math.min(u*2,w/Math.max(4,f.name.length)*1.1);s+=`<text x="${(f.minx+f.maxx)/2}" y="${(f.minz+f.maxz)/2}" font-size="${fs.toFixed(2)}" fill="var(--ink-2)" text-anchor="middle" dominant-baseline="middle" style="pointer-events:none">${esc(f.name)}</text>`;});
+  const here=POIS.filter(q=>(visibleCat(q)||q===p)&&Math.abs(q.x-p.x)<WIN*1.6&&Math.abs(q.z-p.z)<WIN*1.6&&(q.levels.includes(L)||(!q.hasLevel&&L===0)));
+  here.sort((a,b)=>(a===p)-(b===p)).forEach(q=>{
+    const sel=q===p,r=u*(sel?2.6:1.7);
+    s+=`<g class="pm" data-i="${POIS.indexOf(q)}" tabindex="0" role="button" aria-label="${esc(q.name)}（${STATUS[q.st].label}）" style="cursor:pointer">`;
+    if(sel)s+=`<circle cx="${q.x}" cy="${q.z}" r="${r*1.3}" fill="none" stroke="var(--floor-hl)" stroke-width="${u*.5}"><animate attributeName="r" values="${r*1.2};${r*2.2};${r*1.2}" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0;1" dur="2s" repeatCount="indefinite"/></circle>`;
+    s+=svgShape(q.st,q.x,q.z,r,`stroke="${q.hasLevel?'var(--surface)':'var(--ink)'}" stroke-width="${u*.4}" ${q.hasLevel?'':`stroke-dasharray="${u*.6} ${u*.4}"`}`);
+    s+=`<text x="${q.x}" y="${q.z+u*.1}" font-size="${(r*(CATS[q.cat].g.length>1?.8:.95)).toFixed(2)}" font-weight="700" fill="${q.st==='limited'?'#3a2a00':'#fff'}" text-anchor="middle" dominant-baseline="middle" style="pointer-events:none">${CATS[q.cat].g}</text></g>`;
+  });
+  if(p.levels.includes(L)||(!p.hasLevel&&L===0)){
+    const fs=u*2.3,tw=[...p.name].reduce((a,ch)=>a+(ch.charCodeAt(0)>255?1:.6),0)*fs+fs*1.2,th=fs*1.9;
+    const tx=p.x+u*4,ty=p.z-u*4-th;
+    s+=`<g style="pointer-events:none"><line x1="${p.x}" y1="${p.z}" x2="${tx}" y2="${ty+th}" stroke="var(--ink)" stroke-width="${u*.25}"/><rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="${u*.6}" fill="var(--ink)"/><text x="${tx+fs*.6}" y="${ty+th/2}" font-size="${fs}" font-weight="600" fill="var(--bg)" dominant-baseline="middle">${esc(p.name)}</text></g>`;
+  }
+  s+=`<g id="hud"></g>`;
+  svg.setAttribute('font-family','Inter, Noto Sans JP, sans-serif');svg.innerHTML=s;
+  svg.querySelectorAll('.pm').forEach(g=>{const q=POIS[+g.dataset.i];const go=()=>{const lv=q.levels.includes(L)?L:defaultLevel(q);select(q,lv);};g.addEventListener('click',e=>{if(!dragged)go();});g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});});
+  applyVB();
+  const note=document.getElementById('planNote');
+  const msgs=[];
+  if(!p.hasLevel)msgs.push('この地物にはOSMの level タグがないため、階を特定できません（地上階に仮置きしています）。');
+  else if(!p.levels.includes(L))msgs.push(`選択中の「${p.name}」はこの階にはありません（${p.levels.map(lvName).join('・')}）。`);
+  if(!indoor.length)msgs.push('この範囲・この階の屋内図データはOSMにまだありません。');
+  note.hidden=!msgs.length;note.textContent=msgs.join(' ');
+  renderCard();
+}
+function applyVB(){
+  svg.setAttribute('viewBox',vb.map(v=>v.toFixed(2)).join(' '));
+  // north arrow + scale bar drawn in screen-relative units
+  const r=svg.getBoundingClientRect(),hud=svg.querySelector('#hud');if(!hud||r.width<20||r.height<20)return;
+  const k=Math.max(vb[2]/r.width,vb[3]/r.height);
+  const cx=vb[0]+vb[2]/2,cy=vb[1]+vb[3]/2,left=cx-r.width*k/2,top=cy-r.height*k/2,right=cx+r.width*k/2,bottom=cy+r.height*k/2;
+  const nx=right-26*k,ny=top+70*k,len=[5,10,20,50,100].find(v=>v/k>60)||100,sx=right-16*k-len,sy=bottom-18*k;
+  hud.innerHTML=`<path d="M${nx} ${ny-14*k}L${nx+7*k} ${ny+7*k}L${nx} ${ny+3*k}L${nx-7*k} ${ny+7*k}Z" fill="var(--ink)"/><text x="${nx}" y="${ny+20*k}" font-size="${11*k}" font-weight="700" fill="var(--ink)" text-anchor="middle">N</text>
+  <rect x="${sx}" y="${sy-3*k}" width="${len}" height="${6*k}" fill="var(--ink)"/><rect x="${sx+len/2}" y="${sy-3*k}" width="${len/2}" height="${6*k}" fill="var(--surface)" stroke="var(--ink)" stroke-width="${k}"/><text x="${sx+len/2}" y="${sy-8*k}" font-size="${11*k}" fill="var(--ink)" text-anchor="middle">${len} m</text>`;
+}
+let dragged=false,drag=null;
+svg.addEventListener('wheel',e=>{e.preventDefault();if(!vb)return;const r=svg.getBoundingClientRect(),f=e.deltaY>0?1.15:1/1.15;
+  const k=Math.max(vb[2]/r.width,vb[3]/r.height),cx=vb[0]+vb[2]/2+(e.clientX-r.left-r.width/2)*k,cy=vb[1]+vb[3]/2+(e.clientY-r.top-r.height/2)*k;
+  const w=Math.min(600,Math.max(15,vb[2]*f)),h=w*vb[3]/vb[2];vb=[cx-(cx-vb[0])*w/vb[2],cy-(cy-vb[1])*h/vb[3],w,h];applyVB();},{passive:false});
+svg.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,vb:vb.slice()};dragged=false;});
+addEventListener('pointermove',e=>{if(!drag)return;const r=svg.getBoundingClientRect(),k=Math.max(vb[2]/r.width,vb[3]/r.height);const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>4)dragged=true;if(dragged){vb=[drag.vb[0]-dx*k,drag.vb[1]-dy*k,vb[2],vb[3]];applyVB();}});
+addEventListener('pointerup',()=>{drag=null;setTimeout(()=>dragged=false,0);});
+new ResizeObserver(()=>{if(vb&&state.poi)applyVB();}).observe(svg);
+
+function renderCard(){
+  const p=state.poi,t=p.t,[lat,lon]=toLatLon(p.x,p.z);
+  const [type,id]=p.id.split('/');
+  const rows=[];
+  rows.push(`<div>${mini(p.st,20)}<p style="margin:0"><b>車椅子：${STATUS[p.st].label}</b><span>${t['wheelchair:description']?esc(t['wheelchair:description']):STATUS[p.st].long}</span></p></div>`);
+  if(t['toilets:wheelchair']){const ts=t['toilets:wheelchair']==='yes'?'yes':t['toilets:wheelchair']==='no'?'no':'limited';rows.push(`<div>${mini(ts,20)}<p style="margin:0"><b>車椅子用トイレ：${ts==='yes'?'あり':ts==='no'?'なし':'一部'}</b><span>toilets:wheelchair=${esc(t['toilets:wheelchair'])}</span></p></div>`);}
+  rows.push(p.hasLevel
+    ?`<div><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6l7-3 7 3-7 3zM3 10l7 3 7-3M3 14l7 3 7-3" fill="none" stroke="var(--floor-hl)" stroke-width="1.6" stroke-linejoin="round"/></svg><p style="margin:0"><b>階：${p.levels.map(lvName).join('・')}</b><span>level=${esc(t.level||'')}${t.repeat_on?`・repeat_on=${esc(t.repeat_on)}`:''}（level 0 を地上1Fとして表示）</span></p></div>`
+    :`<div class="warn"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3 18 17H2Z" fill="none" stroke="var(--s-no)" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 8v4" stroke="var(--s-no)" stroke-width="1.6"/></svg><p style="margin:0"><b>階の情報がありません</b><span>OSMに level タグがないため、3Dでの高さ（Z）が決まりません。追加すると立体表示が正確になります。</span></p></div>`);
+  const tags=Object.entries(t).map(([k,v])=>`<span class="k">${esc(k)}</span>=${esc(v)}`).join('\n');
+  document.getElementById('card').innerHTML=`
+    <div><h3>${esc(p.name)}</h3><p class="sub">${esc(p.kind)}${p.bld&&p.bld.name?'・'+esc(p.bld.name):''}</p></div>
+    <div class="acc">${rows.join('')}</div>
+    <div class="xyz" aria-label="位置"><div><span>X　経度</span><strong>${lon.toFixed(6)}</strong></div><div><span>Y　緯度</span><strong>${lat.toFixed(6)}</strong></div><div class="z"><span>Z　階</span><strong>${lvName(state.level)}（level ${state.level}）</strong></div></div>
+    <details class="tags"><summary>OpenStreetMapのタグ（${Object.keys(t).length}件）</summary><pre>${tags}</pre></details>
+    <div class="links"><a class="primary" href="https://www.openstreetmap.org/${type}/${id}" target="_blank" rel="noopener">OSMで見る ↗</a><a href="https://www.openstreetmap.org/edit?${type}=${id}" target="_blank" rel="noopener">情報を改善する ↗</a></div>`;
+}
+
+/* ---------- boot ---------- */
+if(renderer){
+  build();camera.position.copy(OVER.p);controls.target.copy(OVER.t);
+  new ResizeObserver(resize).observe(view3d);resize();initPick();refresh();requestAnimationFrame(loop);
+}
+})();
+</script>
