@@ -623,14 +623,15 @@ function renderPlan(resetView){
 function applyVB(){
   svg.setAttribute('viewBox',vb.map(v=>v.toFixed(2)).join(' '));
   // north arrow + scale bar drawn in screen-relative units
-  const r=svg.getBoundingClientRect(),k=Math.max(vb[2]/r.width,vb[3]/r.height)||1,hud=svg.querySelector('#hud');if(!hud)return;
+  const r=svg.getBoundingClientRect(),hud=svg.querySelector('#hud');if(!hud||r.width<20||r.height<20)return;
+  const k=Math.max(vb[2]/r.width,vb[3]/r.height);
   const cx=vb[0]+vb[2]/2,cy=vb[1]+vb[3]/2,left=cx-r.width*k/2,top=cy-r.height*k/2,right=cx+r.width*k/2,bottom=cy+r.height*k/2;
   const nx=right-26*k,ny=top+70*k,len=[5,10,20,50,100].find(v=>v/k>60)||100,sx=right-16*k-len,sy=bottom-18*k;
   hud.innerHTML=`<path d="M${nx} ${ny-14*k}L${nx+7*k} ${ny+7*k}L${nx} ${ny+3*k}L${nx-7*k} ${ny+7*k}Z" fill="var(--ink)"/><text x="${nx}" y="${ny+20*k}" font-size="${11*k}" font-weight="700" fill="var(--ink)" text-anchor="middle">N</text>
   <rect x="${sx}" y="${sy-3*k}" width="${len}" height="${6*k}" fill="var(--ink)"/><rect x="${sx+len/2}" y="${sy-3*k}" width="${len/2}" height="${6*k}" fill="var(--surface)" stroke="var(--ink)" stroke-width="${k}"/><text x="${sx+len/2}" y="${sy-8*k}" font-size="${11*k}" fill="var(--ink)" text-anchor="middle">${len} m</text>`;
 }
 let dragged=false,drag=null;
-svg.addEventListener('wheel',e=>{e.preventDefault();const r=svg.getBoundingClientRect(),f=e.deltaY>0?1.15:1/1.15;
+svg.addEventListener('wheel',e=>{e.preventDefault();if(!vb)return;const r=svg.getBoundingClientRect(),f=e.deltaY>0?1.15:1/1.15;
   const k=Math.max(vb[2]/r.width,vb[3]/r.height),cx=vb[0]+vb[2]/2+(e.clientX-r.left-r.width/2)*k,cy=vb[1]+vb[3]/2+(e.clientY-r.top-r.height/2)*k;
   const w=Math.min(600,Math.max(15,vb[2]*f)),h=w*vb[3]/vb[2];vb=[cx-(cx-vb[0])*w/vb[2],cy-(cy-vb[1])*h/vb[3],w,h];applyVB();},{passive:false});
 svg.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,vb:vb.slice()};dragged=false;});
