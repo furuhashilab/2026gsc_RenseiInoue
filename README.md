@@ -9,6 +9,14 @@
 
 今年度はOSM、Wheelmap、PLATEAU、現地調査結果を組み合わせ、公式プロジェクトへ再利用可能な要件・データ・評価結果として還元することを目指す。
 
+## デモ・成果物
+
+| 名称 | 内容 | リンク |
+|---|---|---|
+| 新宿駅 立体アクセシビリティ表示案（3D＋2D） | OSMの実データで新宿駅周辺を3D表示し、地物を選ぶと2Dの階平面図で階内の位置を確定する表示案モックアップ（パソコン向け） | [公開ページ](https://furuhashilab.github.io/2026gsc_RenseiInoue/mockup/shinjuku/) ・ [説明（#3）](https://github.com/furuhashilab/2026gsc_RenseiInoue/issues/3) |
+
+地図データ：© OpenStreetMap contributors（[ODbL](https://www.openstreetmap.org/copyright)）
+
 ---
 
 ## I. Introduction（背景・目的）
