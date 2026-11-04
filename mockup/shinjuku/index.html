@@ -191,6 +191,7 @@ html,body{overflow:auto}
       <div class="zoom">
         <button type="button" id="zin" aria-label="拡大">+</button>
         <button type="button" id="zout" aria-label="縮小">−</button>
+        <button type="button" id="zorbit" hidden></button>
         <button type="button" id="zreset" aria-label="全体表示に戻る" title="全体表示に戻る"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3 7 14h10L12 3Z" fill="currentColor"/><path d="M12 14v7"/></svg></button>
       </div>
       <div class="attrib">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors（ODbL）・取得 <span id="dataDate"></span></div>
@@ -286,7 +287,8 @@ const EXT=(()=>{let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;BLD.forEach(b=>{x0=Math.min(x0
 const MIN_LEVEL=Math.max(-7,Math.min(-1,...POIS.flatMap(p=>p.levels).filter(Number.isInteger),...INDOOR.flatMap(f=>f.levels).filter(Number.isInteger)));
 const DEPTH=-MIN_LEVEL*H+2;
 const UNDER=POIS.filter(p=>p.hasLevel&&p.levels.every(l=>l<0)).length;
-const glLabels=[];let stems=null;
+const glLabels=[];let stems=null,needles=null;
+const STEM=7;   // pin height above its floor (display units); the needle fills this gap
 const toLatLon=(x,z)=>[LAT0-z/M_LAT,LON0+x/M_LON];
 
 /* ---------- header / chips / legend / list ---------- */
@@ -379,6 +381,9 @@ function build(){
   controls.maxPolarAngle=Math.PI*.46;controls.minDistance=40;controls.maxDistance=2600;
   controls.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.ROTATE};
   controls.touches={ONE:THREE.TOUCH.PAN,TWO:THREE.TOUCH.DOLLY_ROTATE};
+  controls.autoRotateSpeed=1.6;   // about 37 s per turn
+  controls.addEventListener('start',()=>{userActive=true;});
+  controls.addEventListener('end',()=>{userActive=false;userAt=performance.now();});
   scene.add(new THREE.HemisphereLight(0xffffff,0x9aa0aa,.85));
   const sun=new THREE.DirectionalLight(0xffffff,.5);sun.position.set(-300,600,250);scene.add(sun);
 
@@ -449,9 +454,14 @@ function build(){
     lv.forEach(L=>{
       const m=new THREE.SpriteMaterial({map:iconTex(p.st,CATS[p.cat].g),depthTest:false,transparent:true,sizeAttenuation:false});
       const s=new THREE.Sprite(m);s.center.set(.5,.1);
-      s.position.set(p.x,(L==null?0:L*H)+.8,p.z);s.renderOrder=20;s.userData={p,L};scene.add(s);sprites.push(s);
+      const base=L==null?0:L*H;   // floor height the pin points at
+      s.position.set(p.x,base+STEM,p.z);s.renderOrder=20;s.userData={p,L,base};scene.add(s);sprites.push(s);
     });
   });
+  // pin needles: a vertical line from each pin down to its floor, with a dot where it touches the floor
+  const mkNeedle=op=>{const l=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:op,depthTest:false}));l.renderOrder=18;scene.add(l);
+    const d=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({size:4,sizeAttenuation:false,vertexColors:true,transparent:true,opacity:op,depthTest:false}));d.renderOrder=18;scene.add(d);return{l,d};};
+  needles={strong:mkNeedle(.95),dim:mkNeedle(.22)};
   selGroup=new THREE.Group();scene.add(selGroup);
 
   // labels: biggest named buildings
@@ -485,9 +495,16 @@ function refresh(){
       s.material.opacity=op;s.userData.sc=sc;
     });
     lastF=-1;
-    // vertical stems from every visible underground pin up to the ground line
-    const st=[];sprites.forEach(s=>{const {p,L}=s.userData;if(!s.visible||L==null||L>=0)return;if(sel&&Math.hypot(p.x-sel.x,p.z-sel.z)>WIN*1.2)return;st.push(p.x,L*H+.8,p.z,p.x,0,p.z);});
+    // vertical stems from every visible underground floor point up to the ground line
+    const st=[];sprites.forEach(s=>{const {p,L}=s.userData;if(!s.visible||L==null||L>=0)return;if(sel&&Math.hypot(p.x-sel.x,p.z-sel.z)>WIN*1.2)return;st.push(p.x,L*H,p.z,p.x,0,p.z);});
     stems.geometry.dispose();stems.geometry=new THREE.BufferGeometry();stems.geometry.setAttribute('position',new THREE.Float32BufferAttribute(st,3));
+    // pin needles, split into a strong and a dimmed set to follow the pin opacity
+    const nd={strong:{p:[],c:[],dp:[],dc:[]},dim:{p:[],c:[],dp:[],dc:[]}},col=new THREE.Color();
+    sprites.forEach(s=>{if(!s.visible)return;const {p,base}=s.userData,o=s.material.opacity,g=o>=.6?nd.strong:nd.dim;col.set(STATUS[p.st].col);
+      g.p.push(p.x,base,p.z,p.x,base+STEM,p.z);g.c.push(col.r,col.g,col.b,col.r,col.g,col.b);g.dp.push(p.x,base,p.z);g.dc.push(col.r,col.g,col.b);});
+    ['strong','dim'].forEach(k=>{const n=needles[k],g=nd[k];
+      n.l.geometry.dispose();n.l.geometry=new THREE.BufferGeometry();n.l.geometry.setAttribute('position',new THREE.Float32BufferAttribute(g.p,3));n.l.geometry.setAttribute('color',new THREE.Float32BufferAttribute(g.c,3));
+      n.d.geometry.dispose();n.d.geometry=new THREE.BufferGeometry();n.d.geometry.setAttribute('position',new THREE.Float32BufferAttribute(g.dp,3));n.d.geometry.setAttribute('color',new THREE.Float32BufferAttribute(g.dc,3));});
     mats.bldg.opacity=sel?.16:.96;mats.bldg.depthWrite=!sel;mats.edge.opacity=sel?.35:.9;
     const under=sel&&state.level<0;
     mats.ground.opacity=under?.3:.9;mats.earth.opacity=under?.3:.22;
@@ -495,7 +512,11 @@ function refresh(){
   if(drawer.classList.contains('open'))renderList();
 }
 
-let tween=null,lastF=-1;
+let tween=null,lastF=-1,orbitOn=!reduceMotion,userActive=false,userAt=0;
+const orbitBtn=document.getElementById('zorbit');
+function syncOrbitBtn(){orbitBtn.hidden=!state.poi;orbitBtn.setAttribute('aria-pressed',orbitOn);const lab=orbitOn?'回転を止める':'地点の周りを回転する';orbitBtn.title=lab;orbitBtn.setAttribute('aria-label',lab);
+  orbitBtn.innerHTML=orbitOn?'<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg>';}
+orbitBtn.onclick=()=>{orbitOn=!orbitOn;userAt=0;syncOrbitBtn();};
 function flyTo(t,p){if(!controls)return;if(reduceMotion){controls.target.copy(t);camera.position.copy(p);return;}tween={t0:performance.now(),dur:800,ft:controls.target.clone(),fp:camera.position.clone(),tt:t,tp:p};}
 const OVER={t:new THREE.Vector3(40,0,10),p:new THREE.Vector3(-420,760,860)};
 function focus(p,L){
@@ -575,6 +596,8 @@ function place(){
 }
 function loop(now){
   if(tween){const k=Math.min(1,(now-tween.t0)/tween.dur),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;controls.target.lerpVectors(tween.ft,tween.tt,e);camera.position.lerpVectors(tween.fp,tween.tp,e);if(k>=1)tween=null;}
+  // split view: orbit slowly around the selected place; pause while the user drags and for a moment after
+  controls.autoRotate=!!state.poi&&orbitOn&&!tween&&!userActive&&now-userAt>2500;
   controls.update();
   // pins shrink to dots when far away, like Wheelmap's low-zoom markers
   const f=Math.min(1.05,Math.max(.32,330/camera.position.distanceTo(controls.target)));
@@ -612,14 +635,14 @@ function levelsNear(p){
 let floorList=[];
 function select(p,L){
   state.poi=p;state.level=L;tip.hidden=true;hover=null;
-  plan.hidden=false;app.classList.add('split');
+  plan.hidden=false;app.classList.add('split');syncOrbitBtn();
   floorList=levelsNear(p);if(!floorList.includes(L))floorList.push(L),floorList.sort((a,b)=>a-b);
   buildFloorLabels(floorList);refresh();drawSelection();renderPlan(true);
   if(camera){setTimeout(resize,0);setTimeout(resize,480);focus(p,L);}
 }
 function setLevel(L){state.level=L;buildFloorLabels(floorList);refresh();drawSelection();renderPlan(false);if(camera)focus(state.poi,L);}
 function closeSplit(){
-  state.poi=null;state.level=null;app.classList.remove('split');buildFloorLabels([]);refresh();if(selGroup)clearGroup(selGroup);
+  state.poi=null;state.level=null;app.classList.remove('split');syncOrbitBtn();buildFloorLabels([]);refresh();if(selGroup)clearGroup(selGroup);
   setTimeout(()=>{plan.hidden=true;resize();},470);flyTo(OVER.t.clone(),OVER.p.clone());
 }
 document.getElementById('close').onclick=closeSplit;
