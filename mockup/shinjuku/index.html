@@ -227,7 +227,8 @@ html,body{overflow:auto}
 (function(){
 const D=JSON.parse(document.getElementById('osm').textContent);
 const ROADS=JSON.parse(document.getElementById('roads').textContent);
-const H=4.0, WIN=75;
+// Vertical exaggeration: heights (floors and buildings) are drawn VEX times taller than reality so floors separate clearly.
+const VEX=2.5, FLOOR_M=4.0, H=FLOOR_M*VEX, WIN=75;
 const [LAT0,LON0]=D.o, M_LAT=111320, M_LON=111320*Math.cos(LAT0*Math.PI/180);
 document.getElementById('dataDate').textContent=D.date;
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -320,6 +321,7 @@ const mini=(st,s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 20 20" aria-
     <div class="row">${Object.keys(STATUS).map(k=>`<span>${mini(k)}${STATUS[k].label} ${cnt[k]}</span>`).join('')}</div>
     <div><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>階情報（level）のある地物</span><b style="font-variant-numeric:tabular-nums">${withLv} / ${POIS.length}（${pct}%）</b></div><div class="bar"><i style="width:${pct}%"></i></div></div>
     <div class="row"><span style="white-space:normal;align-items:flex-start;line-height:1.45"><svg style="flex:none;margin-top:2px" width="22" height="12" viewBox="0 0 22 12" aria-hidden="true"><rect x="0" y="0" width="22" height="3" fill="var(--gl)"/><rect x="0" y="3" width="22" height="9" fill="var(--earth)" opacity=".45"/><line x1="11" y1="3" x2="11" y2="10" stroke="var(--gl)" stroke-width="1.5"/></svg>茶色の線が地面（GL）。下は地下の断面で、地下の地物 ${UNDER}件は地面まで縦線で示します</span></div>
+    <div class="row"><span style="white-space:normal;align-items:flex-start;line-height:1.45"><svg style="flex:none;margin-top:1px" width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M11 1v12M8 4l3-3 3 3M8 10l3 3 3-3" fill="none" stroke="var(--floor-hl)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>階の違いが分かるよう、高さ（建物・階の間隔）を実際の${VEX}倍に強調しています</span></div>
     <small>OpenStreetMapの実データ（新宿駅周辺 約0.9km四方）。屋内図は ${(()=>{const a=[...indoorLv].filter(Number.isInteger).sort((x,y)=>x-y);return a.length?`${lvName(a[0])}〜${lvName(a[a.length-1])}`:'—';})()} の範囲に ${INDOOR.length}件あります。記号はWheelmapの信号システムに合わせています。</small>`;
 })();
 
@@ -374,7 +376,7 @@ function build(){
   camera=new THREE.PerspectiveCamera(40,1,2,6000);
   controls=new THREE.OrbitControls(camera,canvas);
   controls.enableDamping=true;controls.dampingFactor=.09;controls.screenSpacePanning=false;
-  controls.maxPolarAngle=Math.PI*.46;controls.minDistance=40;controls.maxDistance=1500;
+  controls.maxPolarAngle=Math.PI*.46;controls.minDistance=40;controls.maxDistance=2600;
   controls.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.ROTATE};
   controls.touches={ONE:THREE.TOUCH.PAN,TWO:THREE.TOUCH.DOLLY_ROTATE};
   scene.add(new THREE.HemisphereLight(0xffffff,0x9aa0aa,.85));
@@ -402,7 +404,7 @@ function build(){
   scene.add(earth);
   // labels on the near-left corner: GL and each basement level
   // GL / underground labels follow the corner nearest to the camera (placed every frame)
-  [['地面（GL±0m）',0,' main'],[`地下（〜${lvName(MIN_LEVEL)}・約${-MIN_LEVEL*H}m）`,-depth/2,'']].forEach(([t,y,cls])=>{
+  [['地面（GL±0m）',0,' main'],[`地下（〜${lvName(MIN_LEVEL)}・約${-MIN_LEVEL*FLOOR_M}m）`,-depth/2,'']].forEach(([t,y,cls])=>{
     const el=document.createElement('div');el.className='gllabel'+cls;el.textContent=t;labelsEl.appendChild(el);glLabels.push({el,y});
   });
   stems=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x8a5a2b,transparent:true,opacity:.6}));stems.renderOrder=8;scene.add(stems);
@@ -426,8 +428,8 @@ function build(){
   BLD.forEach(b=>{
     if(b.pts.length<3)return;
     try{
-      const g=new THREE.ExtrudeGeometry(shapeFrom(b.pts),{depth:b.height-b.base,bevelEnabled:false});
-      g.rotateX(-Math.PI/2);g.translate(0,b.base,0);
+      const g=new THREE.ExtrudeGeometry(shapeFrom(b.pts),{depth:(b.height-b.base)*VEX,bevelEnabled:false});
+      g.rotateX(-Math.PI/2);g.translate(0,b.base*VEX,0);
       const ng=g.index?g.toNonIndexed():g;
       pos.push(...ng.attributes.position.array);nor.push(...ng.attributes.normal.array);
       const e=new THREE.EdgesGeometry(g,35);epos.push(...e.attributes.position.array);
@@ -495,11 +497,11 @@ function refresh(){
 
 let tween=null,lastF=-1;
 function flyTo(t,p){if(!controls)return;if(reduceMotion){controls.target.copy(t);camera.position.copy(p);return;}tween={t0:performance.now(),dur:800,ft:controls.target.clone(),fp:camera.position.clone(),tt:t,tp:p};}
-const OVER={t:new THREE.Vector3(40,0,10),p:new THREE.Vector3(-330,520,640)};
+const OVER={t:new THREE.Vector3(40,0,10),p:new THREE.Vector3(-420,760,860)};
 function focus(p,L){
   const t=new THREE.Vector3(p.x,L*H,p.z);
   const dir=camera.position.clone().sub(controls.target);dir.y=0;if(dir.length()<1)dir.set(-.4,0,1);dir.normalize();
-  const dist=340;flyTo(t,t.clone().add(dir.multiplyScalar(dist*Math.cos(.7))).add(new THREE.Vector3(0,dist*Math.sin(.7),0)));
+  const dist=380;flyTo(t,t.clone().add(dir.multiplyScalar(dist*Math.cos(.7))).add(new THREE.Vector3(0,dist*Math.sin(.7),0)));
 }
 
 function clearGroup(g){while(g.children.length){const c=g.children.pop();c.geometry&&c.geometry.dispose();c.material&&c.material.dispose();}}
@@ -560,7 +562,7 @@ function anchor(x0,x1,z0,z1){
   return best;
 }
 function place(){
-  BLD.forEach(b=>{if(!b.labelEl)return;const q=proj(new THREE.Vector3(b.cx,b.height+3,b.cz));b.labelEl.style.display=(q.hide||state.poi)?'none':'block';b.labelEl.style.left=q.x+'px';b.labelEl.style.top=q.y+'px';});
+  BLD.forEach(b=>{if(!b.labelEl)return;const q=proj(new THREE.Vector3(b.cx,b.height*VEX+4,b.cz));b.labelEl.style.display=(q.hide||state.poi)?'none':'block';b.labelEl.style.left=q.x+'px';b.labelEl.style.top=q.y+'px';});
   if(floorLabels.length){
     const R=WIN*1.4,p=state.poi,a=anchor(p.x-R,p.x+R,p.z-R,p.z+R);
     floorLabels.forEach(f=>{if(!a){f.el.style.display='none';return;}const q=proj(tmp2.set(a[0],f.y,a[1]));f.el.style.display=q.hide?'none':'block';f.el.style.left=q.x+'px';f.el.style.top=q.y+'px';});
