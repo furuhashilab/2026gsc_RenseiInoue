@@ -535,23 +535,6 @@ function drawSelection(){
   // vertical guide from ground to the place
   const vg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p.x,Math.min(0,y),p.z),new THREE.Vector3(p.x,Math.max(0,y)+.8,p.z)]);
   const vl=new THREE.Line(vg,new THREE.LineDashedMaterial({color:hl,dashSize:1.2,gapSize:.8}));vl.computeLineDistances();vl.renderOrder=7;selGroup.add(vl);
-  // local cut-away around the place: ground line (GL) and an earth box down to the deepest level here
-  const low=Math.min(0,...floorList);
-  if(low<0){
-    const R=WIN*1.4,dep=-low*H+2,gl=new THREE.Color(css('--gl')),earthC=new THREE.Color(css('--earth'));
-    const xa=p.x-R,xb=p.x+R,za=p.z-R,zb=p.z+R;
-    [[2*R,p.x,za,0],[2*R,p.x,zb,0],[2*R,xa,p.z,Math.PI/2],[2*R,xb,p.z,Math.PI/2]].forEach(([w,x,z,ry])=>{
-      const wall=new THREE.Mesh(new THREE.PlaneGeometry(w,dep),new THREE.MeshBasicMaterial({color:earthC,transparent:true,opacity:.2,depthWrite:false,side:THREE.DoubleSide}));
-      wall.position.set(x,-dep/2,z);wall.rotation.y=ry;wall.renderOrder=2;selGroup.add(wall);
-      const band=new THREE.Mesh(new THREE.PlaneGeometry(w,.9),new THREE.MeshBasicMaterial({color:gl,side:THREE.DoubleSide}));
-      band.position.set(x,-.45,z);band.rotation.y=ry;band.renderOrder=9;selGroup.add(band);
-    });
-    const pts=[],c=[[xa,za],[xb,za],[xb,zb],[xa,zb],[xa,za]];
-    for(let L=0;L>=low;L--)for(let i=0;i<4;i++)pts.push(c[i][0],L*H,c[i][1],c[i+1][0],L*H,c[i+1][1]);
-    c.slice(0,4).forEach(([x,z])=>pts.push(x,0,z,x,-dep,z));
-    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
-    const l=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:gl,transparent:true,opacity:.75}));l.renderOrder=9;selGroup.add(l);
-  }
 }
 
 function resize(){if(!renderer)return;const w=view3d.clientWidth,h=view3d.clientHeight;if(!w||!h)return;renderer.setPixelRatio(Math.min(2,devicePixelRatio));renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
