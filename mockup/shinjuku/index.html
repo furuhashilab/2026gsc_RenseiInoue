@@ -18,6 +18,7 @@
   --s-yes:#46a758;--s-limited:#ffba18;--s-no:#ce2c31;--s-unknown:#7a7a7a;
   --map-ground:#efede8;--map-road:#ffffff;--map-road-edge:#dcd8d0;--map-rail:#b9b4ab;--map-bldg:#e3ded6;--map-edge:#c9c2b6;
   --in-room:#f7f4ee;--in-corr:#e8eefc;--in-wall:#5d5a52;--in-col:#9c978d;
+  --gl:#8a5a2b;--earth:#b98a5a;
   --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 14px rgba(16,24,40,.10);
   --font-ui:"Inter","Noto Sans JP",-apple-system,"Segoe UI",sans-serif;
   --font-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
@@ -26,13 +27,13 @@
   --bg:#111215;--surface:#1a1b20;--surface-2:#24262c;--ink:#eeeef0;--ink-2:#a5a7ae;--line:#2d2f36;--line-strong:#4b4e57;
   --primary:#3e63dd;--primary-ink:#fff;--primary-soft:#1e2541;--floor-hl:#6e8bff;
   --map-ground:#1b1d22;--map-road:#2b2e35;--map-road-edge:#24262c;--map-rail:#4a4d55;--map-bldg:#2e3138;--map-edge:#454953;
-  --in-room:#262931;--in-corr:#1f2a4a;--in-wall:#b9bbc2;--in-col:#5e616a;
+  --in-room:#262931;--in-corr:#1f2a4a;--in-wall:#b9bbc2;--in-col:#5e616a;--gl:#d9a46c;--earth:#7a5636;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.4);color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#111215;--surface:#1a1b20;--surface-2:#24262c;--ink:#eeeef0;--ink-2:#a5a7ae;--line:#2d2f36;--line-strong:#4b4e57;
   --primary:#3e63dd;--primary-ink:#fff;--primary-soft:#1e2541;--floor-hl:#6e8bff;
   --map-ground:#1b1d22;--map-road:#2b2e35;--map-road-edge:#24262c;--map-rail:#4a4d55;--map-bldg:#2e3138;--map-edge:#454953;
-  --in-room:#262931;--in-corr:#1f2a4a;--in-wall:#b9bbc2;--in-col:#5e616a;
+  --in-room:#262931;--in-corr:#1f2a4a;--in-wall:#b9bbc2;--in-col:#5e616a;--gl:#d9a46c;--earth:#7a5636;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.4);color-scheme:dark}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:14px;overflow:hidden}
@@ -64,6 +65,8 @@ a{color:var(--floor-hl)}
 .blabel{position:absolute;transform:translate(-50%,-50%);font-size:11.5px;font-weight:600;color:var(--ink-2);white-space:nowrap;text-shadow:0 0 3px var(--map-ground),0 0 3px var(--map-ground),0 0 2px var(--map-ground)}
 .flabel{position:absolute;transform:translate(10px,-50%);font:500 11px/1 var(--font-mono);color:var(--ink-2);white-space:nowrap;text-shadow:0 0 3px var(--map-ground)}
 .flabel.on{color:#fff;background:var(--floor-hl);padding:3px 5px;border-radius:3px;text-shadow:none}
+.gllabel{position:absolute;transform:translate(calc(-100% - 8px),-50%);font:600 11px/1 var(--font-mono);color:var(--gl);white-space:nowrap;text-shadow:0 0 3px var(--map-ground),0 0 3px var(--map-ground)}
+.gllabel.main{color:#fff;background:var(--gl);padding:3px 6px;border-radius:3px;text-shadow:none;font-family:var(--font-ui)}
 .tip{position:absolute;pointer-events:none;transform:translate(-50%,calc(-100% - 16px));background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:6px;padding:6px 9px;font-size:12px;white-space:nowrap}
 .tip small{display:block;color:var(--ink-2);font-size:11px}
 
@@ -123,6 +126,8 @@ a{color:var(--floor-hl)}
 .floors button{position:relative;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font:600 11.5px var(--font-mono);cursor:pointer;flex:none}
 .floors button[aria-current="true"]{background:var(--floor-hl);color:#fff;border-color:var(--floor-hl)}
 .floors button .dot{position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--s-limited)}
+.floors .gl{flex:none;display:flex;align-items:center;gap:3px;font:700 9.5px/1 var(--font-ui);color:var(--gl);margin:1px -2px}
+.floors .gl::before,.floors .gl::after{content:"";flex:1;height:2px;background:var(--gl)}
 .floors button.noindoor{color:var(--ink-2);font-weight:500}
 .svgwrap{position:relative;min-width:0;min-height:0;background:var(--map-ground);overflow:hidden}
 .svgwrap svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
@@ -275,6 +280,12 @@ const INDOOR=D.i.map(([kind,lv,name,sub,c])=>{
 });
 function pip(x,z,pts){let ins=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const [xi,zi]=pts[i],[xj,zj]=pts[j];if(((zi>z)!==(zj>z))&&(x<(xj-xi)*(z-zi)/(zj-zi)+xi))ins=!ins;}return ins;}
 POIS.forEach(p=>{let best=null;BLD.forEach(b=>{if(b.part||p.x<b.minx||p.x>b.maxx||p.z<b.minz||p.z>b.maxz)return;if(pip(p.x,p.z,b.pts)&&(!best||b.area<best.area))best=b;});p.bld=best;});
+// extent of the data (ground block) and how deep the underground goes
+const EXT=(()=>{let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;BLD.forEach(b=>{x0=Math.min(x0,b.minx);x1=Math.max(x1,b.maxx);z0=Math.min(z0,b.minz);z1=Math.max(z1,b.maxz);});return{x0:x0-15,x1:x1+15,z0:z0-15,z1:z1+15};})();
+const MIN_LEVEL=Math.max(-7,Math.min(-1,...POIS.flatMap(p=>p.levels).filter(Number.isInteger),...INDOOR.flatMap(f=>f.levels).filter(Number.isInteger)));
+const DEPTH=-MIN_LEVEL*H+2;
+const UNDER=POIS.filter(p=>p.hasLevel&&p.levels.every(l=>l<0)).length;
+const glLabels=[];let stems=null;
 const toLatLon=(x,z)=>[LAT0-z/M_LAT,LON0+x/M_LON];
 
 /* ---------- header / chips / legend / list ---------- */
@@ -308,6 +319,7 @@ const mini=(st,s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 20 20" aria-
   document.getElementById('legend').innerHTML=`
     <div class="row">${Object.keys(STATUS).map(k=>`<span>${mini(k)}${STATUS[k].label} ${cnt[k]}</span>`).join('')}</div>
     <div><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>階情報（level）のある地物</span><b style="font-variant-numeric:tabular-nums">${withLv} / ${POIS.length}（${pct}%）</b></div><div class="bar"><i style="width:${pct}%"></i></div></div>
+    <div class="row"><span style="white-space:normal;align-items:flex-start;line-height:1.45"><svg style="flex:none;margin-top:2px" width="22" height="12" viewBox="0 0 22 12" aria-hidden="true"><rect x="0" y="0" width="22" height="3" fill="var(--gl)"/><rect x="0" y="3" width="22" height="9" fill="var(--earth)" opacity=".45"/><line x1="11" y1="3" x2="11" y2="10" stroke="var(--gl)" stroke-width="1.5"/></svg>茶色の線が地面（GL）。下は地下の断面で、地下の地物 ${UNDER}件は地面まで縦線で示します</span></div>
     <small>OpenStreetMapの実データ（新宿駅周辺 約0.9km四方）。屋内図は ${(()=>{const a=[...indoorLv].filter(Number.isInteger).sort((x,y)=>x-y);return a.length?`${lvName(a[0])}〜${lvName(a[a.length-1])}`:'—';})()} の範囲に ${INDOOR.length}件あります。記号はWheelmapの信号システムに合わせています。</small>`;
 })();
 
@@ -368,8 +380,32 @@ function build(){
   scene.add(new THREE.HemisphereLight(0xffffff,0x9aa0aa,.85));
   const sun=new THREE.DirectionalLight(0xffffff,.5);sun.position.set(-300,600,250);scene.add(sun);
 
-  mats.ground=new THREE.MeshBasicMaterial({color:0xefede8,transparent:true,opacity:1,depthWrite:false});
-  ground=new THREE.Mesh(new THREE.PlaneGeometry(2400,2400),mats.ground);ground.rotation.x=-Math.PI/2;ground.renderOrder=-3;scene.add(ground);
+  // ground as a block cut to the data extent, with an earth cross-section below it so the ground line (GL) is visible
+  const {x0,x1,z0,z1}=EXT,gw=x1-x0,gd=z1-z0,depth=DEPTH;
+  mats.ground=new THREE.MeshBasicMaterial({color:0xefede8,transparent:true,opacity:.9,depthWrite:false,side:THREE.DoubleSide});
+  ground=new THREE.Mesh(new THREE.PlaneGeometry(gw,gd),mats.ground);ground.rotation.x=-Math.PI/2;ground.position.set((x0+x1)/2,0,(z0+z1)/2);ground.renderOrder=-3;scene.add(ground);
+  mats.earth=new THREE.MeshBasicMaterial({color:0xb98a5a,transparent:true,opacity:.22,depthWrite:false,side:THREE.DoubleSide});
+  mats.glBand=new THREE.MeshBasicMaterial({color:0x8a5a2b,side:THREE.DoubleSide});
+  const earth=new THREE.Group();
+  [[gw,(x0+x1)/2,z0,0],[gw,(x0+x1)/2,z1,0],[gd,x0,(z0+z1)/2,Math.PI/2],[gd,x1,(z0+z1)/2,Math.PI/2]].forEach(([w,x,z,ry])=>{
+    const wall=new THREE.Mesh(new THREE.PlaneGeometry(w,depth),mats.earth);wall.position.set(x,-depth/2,z);wall.rotation.y=ry;wall.renderOrder=-4;earth.add(wall);
+    const band=new THREE.Mesh(new THREE.PlaneGeometry(w,1.6),mats.glBand);band.position.set(x,-.8,z);band.rotation.y=ry;band.renderOrder=-1;earth.add(band); // thick ground line
+  });
+  const bottom=new THREE.Mesh(new THREE.PlaneGeometry(gw,gd),mats.earth);bottom.rotation.x=-Math.PI/2;bottom.position.set((x0+x1)/2,-depth,(z0+z1)/2);bottom.renderOrder=-4;earth.add(bottom);
+  // basement level lines on the section walls
+  const ll=[],loop=y=>{const c=[[x0,z0],[x1,z0],[x1,z1],[x0,z1],[x0,z0]];for(let i=0;i<4;i++)ll.push(c[i][0],y,c[i][1],c[i+1][0],y,c[i+1][1]);};
+  for(let L=-1;L*H>-depth;L--)loop(L*H);
+  [[x0,z0],[x1,z0],[x1,z1],[x0,z1]].forEach(([x,z])=>ll.push(x,0,z,x,-depth,z));
+  const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.Float32BufferAttribute(ll,3));
+  mats.earthLine=new THREE.LineBasicMaterial({color:0x8a5a2b,transparent:true,opacity:.55});
+  earth.add(new THREE.LineSegments(lg,mats.earthLine));
+  scene.add(earth);
+  // labels on the near-left corner: GL and each basement level
+  // GL / underground labels follow the corner nearest to the camera (placed every frame)
+  [['地面（GL±0m）',0,' main'],[`地下（〜${lvName(MIN_LEVEL)}・約${-MIN_LEVEL*H}m）`,-depth/2,'']].forEach(([t,y,cls])=>{
+    const el=document.createElement('div');el.className='gllabel'+cls;el.textContent=t;labelsEl.appendChild(el);glLabels.push({el,y});
+  });
+  stems=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x8a5a2b,transparent:true,opacity:.6}));stems.renderOrder=8;scene.add(stems);
 
   // roads as flat ribbons
   const rp=[],rr=[];
@@ -426,6 +462,7 @@ function theme(){
   const c=n=>new THREE.Color(css(n));
   scene.background=c('--map-ground');mats.ground.color=c('--map-ground');mats.road.color=c('--map-road');mats.rail.color=c('--map-rail');
   mats.bldg.color=c('--map-bldg');mats.edge.color=c('--map-edge');
+  mats.earth.color=c('--earth');mats.glBand.color=c('--gl');mats.earthLine.color=c('--gl');stems.material.color=c('--gl');
   if(state.poi)drawSelection();
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',theme);
@@ -442,12 +479,16 @@ function refresh(){
         const onLv=p.cat==='elevator'?p.levels.includes(state.level):(L===state.level||(L==null&&state.level===0));
         op=!near?.12:onLv?1:.3;
         if(p===sel){sc=.05;op=1;}
-      }
+      }else if(L!=null&&L<0)op=.7;   // underground pins read as "below the surface"
       s.material.opacity=op;s.userData.sc=sc;
     });
     lastF=-1;
+    // vertical stems from every visible underground pin up to the ground line
+    const st=[];sprites.forEach(s=>{const {p,L}=s.userData;if(!s.visible||L==null||L>=0)return;if(sel&&Math.hypot(p.x-sel.x,p.z-sel.z)>WIN*1.2)return;st.push(p.x,L*H+.8,p.z,p.x,0,p.z);});
+    stems.geometry.dispose();stems.geometry=new THREE.BufferGeometry();stems.geometry.setAttribute('position',new THREE.Float32BufferAttribute(st,3));
     mats.bldg.opacity=sel?.16:.96;mats.bldg.depthWrite=!sel;mats.edge.opacity=sel?.35:.9;
-    mats.ground.opacity=sel&&state.level<0?.35:1;
+    const under=sel&&state.level<0;
+    mats.ground.opacity=under?.3:.9;mats.earth.opacity=under?.3:.22;
   }
   if(drawer.classList.contains('open'))renderList();
 }
@@ -458,7 +499,7 @@ const OVER={t:new THREE.Vector3(40,0,10),p:new THREE.Vector3(-330,520,640)};
 function focus(p,L){
   const t=new THREE.Vector3(p.x,L*H,p.z);
   const dir=camera.position.clone().sub(controls.target);dir.y=0;if(dir.length()<1)dir.set(-.4,0,1);dir.normalize();
-  const dist=230;flyTo(t,t.clone().add(dir.multiplyScalar(dist*Math.cos(.7))).add(new THREE.Vector3(0,dist*Math.sin(.7),0)));
+  const dist=340;flyTo(t,t.clone().add(dir.multiplyScalar(dist*Math.cos(.7))).add(new THREE.Vector3(0,dist*Math.sin(.7),0)));
 }
 
 function clearGroup(g){while(g.children.length){const c=g.children.pop();c.geometry&&c.geometry.dispose();c.material&&c.material.dispose();}}
@@ -494,6 +535,23 @@ function drawSelection(){
   // vertical guide from ground to the place
   const vg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p.x,Math.min(0,y),p.z),new THREE.Vector3(p.x,Math.max(0,y)+.8,p.z)]);
   const vl=new THREE.Line(vg,new THREE.LineDashedMaterial({color:hl,dashSize:1.2,gapSize:.8}));vl.computeLineDistances();vl.renderOrder=7;selGroup.add(vl);
+  // local cut-away around the place: ground line (GL) and an earth box down to the deepest level here
+  const low=Math.min(0,...floorList);
+  if(low<0){
+    const R=WIN*1.4,dep=-low*H+2,gl=new THREE.Color(css('--gl')),earthC=new THREE.Color(css('--earth'));
+    const xa=p.x-R,xb=p.x+R,za=p.z-R,zb=p.z+R;
+    [[2*R,p.x,za,0],[2*R,p.x,zb,0],[2*R,xa,p.z,Math.PI/2],[2*R,xb,p.z,Math.PI/2]].forEach(([w,x,z,ry])=>{
+      const wall=new THREE.Mesh(new THREE.PlaneGeometry(w,dep),new THREE.MeshBasicMaterial({color:earthC,transparent:true,opacity:.2,depthWrite:false,side:THREE.DoubleSide}));
+      wall.position.set(x,-dep/2,z);wall.rotation.y=ry;wall.renderOrder=2;selGroup.add(wall);
+      const band=new THREE.Mesh(new THREE.PlaneGeometry(w,.9),new THREE.MeshBasicMaterial({color:gl,side:THREE.DoubleSide}));
+      band.position.set(x,-.45,z);band.rotation.y=ry;band.renderOrder=9;selGroup.add(band);
+    });
+    const pts=[],c=[[xa,za],[xb,za],[xb,zb],[xa,zb],[xa,za]];
+    for(let L=0;L>=low;L--)for(let i=0;i<4;i++)pts.push(c[i][0],L*H,c[i][1],c[i+1][0],L*H,c[i+1][1]);
+    c.slice(0,4).forEach(([x,z])=>pts.push(x,0,z,x,-dep,z));
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+    const l=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:gl,transparent:true,opacity:.75}));l.renderOrder=9;selGroup.add(l);
+  }
 }
 
 function resize(){if(!renderer)return;const w=view3d.clientWidth,h=view3d.clientHeight;if(!w||!h)return;renderer.setPixelRatio(Math.min(2,devicePixelRatio));renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
@@ -503,13 +561,31 @@ function buildFloorLabels(levels){
   floorLabels.forEach(f=>f.el.remove());floorLabels=[];
   if(!state.poi||!renderer)return;
   levels.forEach(L=>{const el=document.createElement('div');el.className='flabel'+(L===state.level?' on':'');el.textContent=lvName(L);labelsEl.appendChild(el);
-    floorLabels.push({el,v:new THREE.Vector3(state.poi.x+WIN*1.4,L*H,state.poi.z+WIN*1.4)});});
+    floorLabels.push({el,y:L*H+H/2});});
+  if(levels.some(l=>l<0)){const el=document.createElement('div');el.className='gllabel main';el.textContent='地面 GL';labelsEl.appendChild(el);
+    floorLabels.push({el,y:0});}
 }
-const tmp=new THREE.Vector3();
+const tmp=new THREE.Vector3(),tmp2=new THREE.Vector3();
 function proj(v){tmp.copy(v).project(camera);return{x:(tmp.x+1)/2*view3d.clientWidth,y:(1-tmp.y)/2*view3d.clientHeight,hide:tmp.z>1};}
+// pick a point on the box outline (corners and edge midpoints at ground level) that is on screen and nearest the camera
+function anchor(x0,x1,z0,z1){
+  const w=view3d.clientWidth,h=view3d.clientHeight,mx=(x0+x1)/2,mz=(z0+z1)/2;let best=null,bd=1e18;
+  [[x0,z0],[x1,z0],[x1,z1],[x0,z1],[mx,z0],[mx,z1],[x0,mz],[x1,mz]].forEach(([x,z])=>{
+    const q=proj(tmp2.set(x,0,z));if(q.hide||q.x<90||q.x>w-30||q.y<70||q.y>h-60)return;
+    const d=(camera.position.x-x)**2+(camera.position.z-z)**2;if(d<bd){bd=d;best=[x,z];}
+  });
+  return best;
+}
 function place(){
   BLD.forEach(b=>{if(!b.labelEl)return;const q=proj(new THREE.Vector3(b.cx,b.height+3,b.cz));b.labelEl.style.display=(q.hide||state.poi)?'none':'block';b.labelEl.style.left=q.x+'px';b.labelEl.style.top=q.y+'px';});
-  floorLabels.forEach(f=>{const q=proj(f.v);f.el.style.display=q.hide?'none':'block';f.el.style.left=q.x+'px';f.el.style.top=q.y+'px';});
+  if(floorLabels.length){
+    const R=WIN*1.4,p=state.poi,a=anchor(p.x-R,p.x+R,p.z-R,p.z+R);
+    floorLabels.forEach(f=>{if(!a){f.el.style.display='none';return;}const q=proj(tmp2.set(a[0],f.y,a[1]));f.el.style.display=q.hide?'none':'block';f.el.style.left=q.x+'px';f.el.style.top=q.y+'px';});
+  }
+  if(glLabels.length){
+    const a=state.poi?null:anchor(EXT.x0,EXT.x1,EXT.z0,EXT.z1);
+    glLabels.forEach(f=>{if(!a){f.el.style.display='none';return;}const q=proj(tmp2.set(a[0],f.y,a[1]));f.el.style.display=q.hide?'none':'block';f.el.style.left=q.x+'px';f.el.style.top=q.y+'px';});
+  }
   if(hover){const q=proj(hover.position);tip.style.left=q.x+'px';tip.style.top=q.y+'px';}
 }
 function loop(now){
@@ -575,7 +651,8 @@ function renderPlan(resetView){
   const hasIndoor=new Set();INDOOR.forEach(f=>{if(f.maxx>p.x-WIN&&f.minx<p.x+WIN&&f.maxz>p.z-WIN&&f.minz<p.z+WIN)f.levels.forEach(l=>hasIndoor.add(l));});
   [...floorList].reverse().forEach(l=>{const b=document.createElement('button');b.type='button';b.textContent=lvName(l);b.setAttribute('aria-current',l===L);
     if(!hasIndoor.has(l))b.classList.add('noindoor');b.title=hasIndoor.has(l)?`${lvName(l)}（屋内図あり）`:`${lvName(l)}（屋内図なし）`;
-    if(p.levels.includes(l))b.insertAdjacentHTML('beforeend','<span class="dot" aria-hidden="true"></span>');b.onclick=()=>setLevel(l);fl.appendChild(b);});
+    if(p.levels.includes(l))b.insertAdjacentHTML('beforeend','<span class="dot" aria-hidden="true"></span>');b.onclick=()=>setLevel(l);fl.appendChild(b);
+    if(l===0&&floorList.some(v=>v<0))fl.insertAdjacentHTML('beforeend','<div class="gl" title="ここより下が地下">地面</div>');});
   setTimeout(()=>{const cur=fl.querySelector('[aria-current="true"]');cur&&cur.scrollIntoView({block:'nearest'});},0);
 
   if(resetView||!vb)vb=[p.x-WIN*.65,p.z-WIN*.65,WIN*1.3,WIN*1.3];
