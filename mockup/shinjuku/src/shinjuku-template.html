@@ -143,6 +143,24 @@ a{color:var(--floor-hl)}
 details.tags summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--ink-2)}
 details.tags pre{margin:6px 0 0;font:12px/1.6 var(--font-mono);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;overflow-x:auto;white-space:pre}
 details.tags .k{color:var(--ink-2)}
+.tagger{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:8px}
+.tagger summary{cursor:pointer;font-weight:700;font-size:13px}
+.tagger[open] summary{margin-bottom:2px}
+.tagger .help{margin:0;font-size:12px;color:var(--ink-2);line-height:1.55}
+.tagger .lbl{font-size:11.5px;font-weight:600;color:var(--ink-2);margin:0}
+.lvchips{display:flex;flex-wrap:wrap;gap:4px}
+.lvchip{position:relative;display:inline-flex;align-items:center;height:26px;padding:0 9px;border:1px solid var(--line-strong);border-radius:999px;font:600 11.5px var(--font-mono);cursor:pointer;user-select:none;background:var(--surface)}
+.lvchip input{position:absolute;opacity:0;pointer-events:none}
+.lvchip:has(input:checked){background:var(--floor-hl);border-color:var(--floor-hl);color:#fff}
+.lvchip:has(input:focus-visible){outline:2px solid var(--floor-hl);outline-offset:2px}
+.lvchip.gl{border-style:dashed;color:var(--gl);cursor:default;font-family:var(--font-ui);font-size:10.5px}
+.tagger select{height:30px;border:1px solid var(--line-strong);border-radius:5px;background:var(--surface);padding:0 6px}
+.tagger pre{margin:0;font:12.5px/1.6 var(--font-mono);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;white-space:pre-wrap}
+.tagger .diff{font:11.5px/1.5 var(--font-mono);color:var(--ink-2);margin:0;white-space:pre-wrap}
+.tagger .btns{display:flex;gap:6px;flex-wrap:wrap}
+.btn{height:30px;padding:0 12px;border-radius:5px;border:1px solid var(--line-strong);background:var(--surface);font-size:12.5px;font-weight:600;cursor:pointer}
+.btn.primary{background:var(--primary);color:var(--primary-ink);border-color:var(--primary)}
+.edited{display:inline-block;font-size:11px;font-weight:700;color:#3a2a00;background:var(--s-limited);padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:2px}
 .links{display:flex;flex-wrap:wrap;gap:8px}
 .links a{display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 12px;border-radius:5px;background:var(--primary-soft);color:var(--primary);font-size:12.5px;font-weight:600;text-decoration:none}
 :root[data-theme="dark"] .links a{color:#c8d2ff}
@@ -278,7 +296,7 @@ const EXT=(()=>{let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;BLD.forEach(b=>{x0=Math.min(x0
 const MIN_LEVEL=Math.max(-7,Math.min(-1,...POIS.flatMap(p=>p.levels).filter(Number.isInteger),...INDOOR.flatMap(f=>f.levels).filter(Number.isInteger)));
 const DEPTH=-MIN_LEVEL*H+2;
 const UNDER=POIS.filter(p=>p.hasLevel&&p.levels.every(l=>l<0)).length;
-const glLabels=[];let stems=null,needles=null;
+const glLabels=[];let stems=null,needles=null,connectors=null,stops=null;
 const STEM=7;   // pin height above its floor (display units); the needle fills this gap
 const toLatLon=(x,z)=>[LAT0-z/M_LAT,LON0+x/M_LON];
 
@@ -439,16 +457,12 @@ function build(){
   mats.edge=new THREE.LineBasicMaterial({color:0xc9c2b6,transparent:true,opacity:.9});
   bldEdges=new THREE.LineSegments(eg,mats.edge);bldEdges.renderOrder=2;scene.add(bldEdges);
 
-  // pins
-  POIS.forEach(p=>{
-    const lv=p.cat==='elevator'&&p.hasLevel?[p.levels[p.levels.length-1]]:(p.hasLevel?p.levels:[null]);
-    lv.forEach(L=>{
-      const m=new THREE.SpriteMaterial({map:iconTex(p.st,CATS[p.cat].g),depthTest:false,transparent:true,sizeAttenuation:false});
-      const s=new THREE.Sprite(m);s.center.set(.5,.1);
-      const base=L==null?0:L*H;   // floor height the pin points at
-      s.position.set(p.x,base+STEM,p.z);s.renderOrder=20;s.userData={p,L,base};scene.add(s);sprites.push(s);
-    });
-  });
+  // pins (+ elevator shafts) for every place
+  mats.shaft=new THREE.MeshLambertMaterial({color:0x3e63dd,transparent:true,opacity:.3,depthWrite:false});
+  POIS.forEach(makePins);
+  // dashed connectors for places that repeat on several floors, and stop dots on elevator shafts
+  connectors=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineDashedMaterial({vertexColors:true,dashSize:2,gapSize:1.4,transparent:true,opacity:.9,depthTest:false}));connectors.renderOrder=17;scene.add(connectors);
+  stops=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({size:6,sizeAttenuation:false,color:0x3e63dd,transparent:true,depthTest:false}));stops.renderOrder=19;scene.add(stops);
   // pin needles: a vertical line from each pin down to its floor, with a dot where it touches the floor
   const mkNeedle=op=>{const l=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:op,depthTest:false}));l.renderOrder=18;scene.add(l);
     const d=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({size:4,sizeAttenuation:false,vertexColors:true,transparent:true,opacity:op,depthTest:false}));d.renderOrder=18;scene.add(d);return{l,d};};
@@ -460,6 +474,25 @@ function build(){
   theme();
 }
 
+// (Re)create the pins of one place. Places on several floors are drawn as one vertical object:
+// an elevator gets a shaft spanning its floors with a single pin on top; other places get one pin per floor, joined by a dashed line.
+function makePins(p){
+  (p.sprites||[]).forEach(s=>{scene.remove(s);s.material.dispose();const i=sprites.indexOf(s);if(i>=0)sprites.splice(i,1);});
+  if(p.shaft){scene.remove(p.shaft);p.shaft.geometry.dispose();p.shaft=null;}
+  p.sprites=[];
+  const multi=p.levels.length>1;
+  const lv=p.cat==='elevator'&&p.hasLevel?[p.levels[p.levels.length-1]]:(p.hasLevel?p.levels:[null]);
+  lv.forEach(L=>{
+    const m=new THREE.SpriteMaterial({map:iconTex(p.st,CATS[p.cat].g),depthTest:false,transparent:true,sizeAttenuation:false});
+    const s=new THREE.Sprite(m);s.center.set(.5,.1);
+    const base=L==null?0:L*H;   // floor height the pin points at
+    s.position.set(p.x,base+STEM,p.z);s.renderOrder=20;s.userData={p,L,base};scene.add(s);sprites.push(s);p.sprites.push(s);
+  });
+  if(p.cat==='elevator'&&multi){
+    const lo=p.levels[0]*H,hi=p.levels[p.levels.length-1]*H+STEM*.6;
+    const m=new THREE.Mesh(new THREE.BoxGeometry(2.6,hi-lo,2.6),mats.shaft.clone());m.position.set(p.x,(lo+hi)/2,p.z);m.renderOrder=6;m.userData={p};scene.add(m);p.shaft=m;
+  }
+}
 function theme(){
   if(!scene)return;
   const c=n=>new THREE.Color(css(n));
@@ -496,6 +529,18 @@ function refresh(){
     ['strong','dim'].forEach(k=>{const n=needles[k],g=nd[k];
       n.l.geometry.dispose();n.l.geometry=new THREE.BufferGeometry();n.l.geometry.setAttribute('position',new THREE.Float32BufferAttribute(g.p,3));n.l.geometry.setAttribute('color',new THREE.Float32BufferAttribute(g.c,3));
       n.d.geometry.dispose();n.d.geometry=new THREE.BufferGeometry();n.d.geometry.setAttribute('position',new THREE.Float32BufferAttribute(g.dp,3));n.d.geometry.setAttribute('color',new THREE.Float32BufferAttribute(g.dc,3));});
+    // multi-floor places: shafts, dashed connectors and elevator stop dots
+    const cn=[],cc=[],sp=[],hl=new THREE.Color(css('--floor-hl'));
+    POIS.forEach(p=>{
+      if(p.levels.length<2)return;
+      const vis=visibleCat(p)||p===sel,near=!sel||Math.hypot(p.x-sel.x,p.z-sel.z)<WIN*1.2;
+      if(p.shaft){p.shaft.visible=vis;p.shaft.material.color=hl;p.shaft.material.opacity=!sel?.3:p===sel?.7:near?.4:.06;}
+      if(!vis||!near)return;
+      if(p.cat==='elevator')p.levels.forEach(l=>sp.push(p.x,l*H,p.z));
+      else{col.set(STATUS[p.st].col);const a=p.levels[0]*H,b=p.levels[p.levels.length-1]*H+STEM;cn.push(p.x,a,p.z,p.x,b,p.z);cc.push(col.r,col.g,col.b,col.r,col.g,col.b);}
+    });
+    connectors.geometry.dispose();connectors.geometry=new THREE.BufferGeometry();connectors.geometry.setAttribute('position',new THREE.Float32BufferAttribute(cn,3));connectors.geometry.setAttribute('color',new THREE.Float32BufferAttribute(cc,3));connectors.computeLineDistances();
+    stops.geometry.dispose();stops.geometry=new THREE.BufferGeometry();stops.geometry.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));stops.material.color=hl;
     mats.bldg.opacity=sel?.16:.96;mats.bldg.depthWrite=!sel;mats.edge.opacity=sel?.35:.9;
     const under=sel&&state.level<0;
     mats.ground.opacity=under?.3:.9;mats.earth.opacity=under?.3:.22;
@@ -603,7 +648,10 @@ document.getElementById('zreset').onclick=()=>{if(state.poi)closeSplit();else fl
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),tip=document.createElement('div');tip.className='tip';tip.hidden=true;labelsEl.appendChild(tip);
 let hover=null,down=null;
 function pick(e){const r=canvas.getBoundingClientRect();mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mouse,camera);
-  const h=ray.intersectObjects(sprites.filter(s=>s.visible&&s.material.opacity>.25));return h.length?h[0].object:null;}
+  const h=ray.intersectObjects(sprites.filter(s=>s.visible&&s.material.opacity>.25));if(h.length)return h[0].object;
+  // clicking an elevator shaft picks that elevator
+  const sh=ray.intersectObjects(POIS.filter(p=>p.shaft&&p.shaft.visible&&p.shaft.material.opacity>.2).map(p=>p.shaft));
+  return sh.length?sh[0].object.userData.p.sprites[0]:null;}
 function initPick(){
   canvas.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];});
   canvas.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse'||e.buttons)return;const s=pick(e);hover=s;canvas.style.cursor=s?'pointer':'';
@@ -722,15 +770,70 @@ function renderCard(){
   rows.push(`<div>${mini(p.st,20)}<p style="margin:0"><b>車椅子：${STATUS[p.st].label}</b><span>${t['wheelchair:description']?esc(t['wheelchair:description']):STATUS[p.st].long}</span></p></div>`);
   if(t['toilets:wheelchair']){const ts=t['toilets:wheelchair']==='yes'?'yes':t['toilets:wheelchair']==='no'?'no':'limited';rows.push(`<div>${mini(ts,20)}<p style="margin:0"><b>車椅子用トイレ：${ts==='yes'?'あり':ts==='no'?'なし':'一部'}</b><span>toilets:wheelchair=${esc(t['toilets:wheelchair'])}</span></p></div>`);}
   rows.push(p.hasLevel
-    ?`<div><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6l7-3 7 3-7 3zM3 10l7 3 7-3M3 14l7 3 7-3" fill="none" stroke="var(--floor-hl)" stroke-width="1.6" stroke-linejoin="round"/></svg><p style="margin:0"><b>階：${p.levels.map(lvName).join('・')}</b><span>level=${esc(t.level||'')}${t.repeat_on?`・repeat_on=${esc(t.repeat_on)}`:''}（level 0 を地上1Fとして表示）</span></p></div>`
+    ?`<div><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6l7-3 7 3-7 3zM3 10l7 3 7-3M3 14l7 3 7-3" fill="none" stroke="var(--floor-hl)" stroke-width="1.6" stroke-linejoin="round"/></svg><p style="margin:0"><b>階：${p.levels.map(lvName).join('・')}</b><span>${p.orig?'画面上で編集した階です（OSMには未反映）':`level=${esc(t.level||'')}${t.repeat_on?`・repeat_on=${esc(t.repeat_on)}`:''}`}（level 0 を地上1Fとして表示）${p.levels.length>1?`<br>同じ位置の${p.levels.length}フロアを1つの地物として表示しています（3Dでは${p.cat==='elevator'?'縦の柱':'点線でつながったピン'}）。`:''}</span></p></div>`
     :`<div class="warn"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3 18 17H2Z" fill="none" stroke="var(--s-no)" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 8v4" stroke="var(--s-no)" stroke-width="1.6"/></svg><p style="margin:0"><b>階の情報がありません</b><span>OSMに level タグがないため、3Dでの高さ（Z）が決まりません。追加すると立体表示が正確になります。</span></p></div>`);
   const tags=Object.entries(t).map(([k,v])=>`<span class="k">${esc(k)}</span>=${esc(v)}`).join('\n');
   document.getElementById('card').innerHTML=`
-    <div><h3>${esc(p.name)}</h3><p class="sub">${esc(p.kind)}${p.bld&&p.bld.name?'・'+esc(p.bld.name):''}</p></div>
+    <div><h3>${esc(p.name)}${p.orig?'<span class="edited">画面上で編集中</span>':''}</h3><p class="sub">${esc(p.kind)}${p.bld&&p.bld.name?'・'+esc(p.bld.name):''}</p></div>
     <div class="acc">${rows.join('')}</div>
     <div class="xyz" aria-label="位置"><div><span>X　経度</span><strong>${lon.toFixed(6)}</strong></div><div><span>Y　緯度</span><strong>${lat.toFixed(6)}</strong></div><div class="z"><span>Z　階</span><strong>${lvName(state.level)}（level ${state.level}）</strong></div></div>
     <details class="tags"><summary>OpenStreetMapのタグ（${Object.keys(t).length}件）</summary><pre>${tags}</pre></details>
+    ${taggerHTML(p)}
     <div class="links"><a class="primary" href="https://www.openstreetmap.org/${type}/${id}" target="_blank" rel="noopener">OSMで見る ↗</a><a href="https://www.openstreetmap.org/edit?${type}=${id}" target="_blank" rel="noopener">情報を改善する ↗</a></div>`;
+  bindTagger(p);
+}
+
+/* ---------- indoor tag builder (for field surveys) ---------- */
+let taggerOpen=false;
+const WC_OPTS=[['','（変更しない）'],['yes','yes（全面）'],['limited','limited（一部）'],['no','no（非対応）']];
+function compressLv(a){const out=[];let i=0;while(i<a.length){let j=i;while(j+1<a.length&&a[j+1]===a[j]+1)j++;if(j-i>=2)out.push(`${a[i]}-${a[j]}`);else for(let k=i;k<=j;k++)out.push(String(a[k]));i=j+1;}return out.join(';');}
+function mainTag(t){for(const k of['highway','amenity','shop','entrance','railway','public_transport','tourism','office'])if(t[k])return`${k}=${t[k]}`;return'';}
+function draftOf(p){if(!p.draft)p.draft={levels:new Set(p.levels.length?p.levels:[state.level]),wc:''};return p.draft;}
+function draftLevels(p){return[...draftOf(p).levels].sort((a,b)=>a-b);}
+function tagLines(p){
+  const d=draftOf(p),lv=draftLevels(p),out=[],m=mainTag(p.t);if(m)out.push(m);
+  if(lv.length){if(p.cat==='elevator')out.push(`level=${lv.join(';')}`);else{out.push(`level=${lv[0]}`);if(lv.length>1)out.push(`repeat_on=${compressLv(lv.slice(1))}`);}}
+  if(d.wc)out.push(`wheelchair=${d.wc}`);
+  return out;
+}
+function tagDiff(p){
+  const now=tagLines(p),cur=[];['level','repeat_on','wheelchair'].forEach(k=>{if(p.t[k])cur.push(`${k}=${p.t[k]}`);});
+  const nk=new Map(now.map(l=>l.split('=')).map(([k,...v])=>[k,v.join('=')]));
+  const lines=[];['level','repeat_on','wheelchair'].forEach(k=>{const a=p.t[k]||'（なし）',b=nk.has(k)?nk.get(k):(k==='wheelchair'?a:'（なし）');if(a!==b)lines.push(`${k}: ${a} → ${b}`);});
+  return lines.length?lines.join('\n'):'現在のOSMのタグから変更はありません';
+}
+function taggerHTML(p){
+  const d=draftOf(p),all=[...new Set([...floorList,...p.levels,...d.levels])].sort((a,b)=>b-a);
+  const chips=all.map(l=>`<label class="lvchip"><input type="checkbox" data-l="${l}" ${d.levels.has(l)?'checked':''}>${lvName(l)}</label>${l===0&&all.some(v=>v<0)?'<span class="lvchip gl" aria-hidden="true">地面</span>':''}`).join('');
+  return `<details class="tagger" id="tagger" ${taggerOpen?'open':''}><summary>インドアタギングを作る（現地調査用）</summary>
+    <p class="help">同じ位置（X・Y）にある階をすべて選ぶと、${p.cat==='elevator'?'エレベーターは停止階を <code>level</code> に並べて':'一番下の階を <code>level</code>、残りの階を <code>repeat_on</code> にして'}、1つの地物としてOSMに登録するタグを作ります。</p>
+    <p class="lbl">この地物がある階</p><div class="lvchips" id="lvchips">${chips}</div>
+    <p class="lbl"><label for="wcSel">車椅子の対応（現地で確認した場合）</label></p>
+    <select id="wcSel">${WC_OPTS.map(([v,l])=>`<option value="${v}" ${d.wc===v?'selected':''}>${l}</option>`).join('')}</select>
+    <p class="lbl">作成されたタグ</p><pre id="tagOut">${esc(tagLines(p).join('\n'))}</pre>
+    <p class="diff" id="tagDiff">${esc(tagDiff(p))}</p>
+    <div class="btns"><button class="btn primary" type="button" id="tagCopy">タグをコピー</button><button class="btn" type="button" id="tagApply">この画面に反映</button>${p.orig?'<button class="btn" type="button" id="tagUndo">元に戻す</button>':''}</div>
+    <p class="help">OSMには自動で書き込みません。「情報を改善する」からOSMの編集画面を開き、内容を確認してから入力してください。</p>
+  </details>`;
+}
+function bindTagger(p){
+  const box=document.getElementById('tagger');if(!box)return;
+  box.addEventListener('toggle',()=>{taggerOpen=box.open;});
+  const upd=()=>{document.getElementById('tagOut').textContent=tagLines(p).join('\n');document.getElementById('tagDiff').textContent=tagDiff(p);};
+  box.querySelectorAll('#lvchips input').forEach(cb=>cb.addEventListener('change',()=>{const d=draftOf(p),l=+cb.dataset.l;cb.checked?d.levels.add(l):d.levels.delete(l);upd();}));
+  document.getElementById('wcSel').addEventListener('change',e=>{draftOf(p).wc=e.target.value;upd();});
+  const copyBtn=document.getElementById('tagCopy');
+  copyBtn.onclick=()=>{const txt=tagLines(p).join('\n');const done=()=>{copyBtn.textContent='コピーしました';setTimeout(()=>copyBtn.textContent='タグをコピー',1600);};
+    const fallback=()=>{const r=document.createRange();r.selectNodeContents(document.getElementById('tagOut'));const s=getSelection();s.removeAllRanges();s.addRange(r);copyBtn.textContent='選択しました（Ctrl+Cでコピー）';};
+    try{navigator.clipboard.writeText(txt).then(done,fallback);}catch(e){fallback();}};
+  document.getElementById('tagApply').onclick=()=>{
+    const lv=draftLevels(p);if(!lv.length)return;
+    if(!p.orig)p.orig={levels:p.levels.slice(),st:p.st,hasLevel:p.hasLevel};
+    p.levels=lv;p.hasLevel=true;const wc=draftOf(p).wc;if(wc)p.st=wc;
+    if(scene)makePins(p);taggerOpen=true;select(p,lv.includes(state.level)?state.level:lv[0]);
+  };
+  const undo=document.getElementById('tagUndo');
+  if(undo)undo.onclick=()=>{Object.assign(p,{levels:p.orig.levels,st:p.orig.st,hasLevel:p.orig.hasLevel});p.orig=null;p.draft=null;if(scene)makePins(p);taggerOpen=true;select(p,p.hasLevel?(p.levels.includes(state.level)?state.level:p.levels[0]):0);};
 }
 
 /* ---------- boot ---------- */
